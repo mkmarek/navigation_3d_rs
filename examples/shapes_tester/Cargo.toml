@@ -1,0 +1,11 @@
+[package]
+name = "shapes_tester"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.12.1" }
+example_utils = { path = "../utils" }
+geometry = { path = "../../crates/geometry" }
+bevy_egui = { version = "0.24.0" }
+

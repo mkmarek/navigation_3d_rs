@@ -1,0 +1,12 @@
+[workspace]
+members = [
+  "examples/*",
+  "crates/*",
+]
+resolver = "2"
+
+[workspace.dependencies]
+bevy_math = { version = "0.12.1" }
+bevy_gizmos = { version = "0.12.1" }
+bevy_render = { version = "0.12.1" }
+bevy_transform = { version = "0.12.1" }

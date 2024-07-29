@@ -1,0 +1,12 @@
+[package]
+name = "svo"
+description = "Sparse Voxel Octree (SVO) implementation for 3D navigation"
+version = "0.0.1"
+edition = "2021"
+license-file = "LICENSE"
+repository = "https://github.com/mkmarek/svo-rs"
+homepage = "https://github.com/mkmarek/svo-rs"
+readme = "README.md"
+
+[dependencies]
+bevy_math = { workspace = true }
