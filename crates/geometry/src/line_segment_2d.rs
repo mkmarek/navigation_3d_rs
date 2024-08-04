@@ -1,6 +1,6 @@
 use bevy_math::Vec2;
 
-use crate::{Vec2Operations, EPSILON};
+use crate::{Ray2D, Vec2Operations, EPSILON};
 
 pub struct LineSegment2D {
     pub origin: Vec2,
@@ -19,6 +19,10 @@ impl LineSegment2D {
             t_min,
             t_max,
         }
+    }
+
+    pub fn to_ray(&self) -> Ray2D {
+        Ray2D::new(self.origin, self.direction)
     }
 }
 

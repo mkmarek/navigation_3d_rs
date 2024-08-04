@@ -63,12 +63,17 @@ pub fn update_grid_texture_materials(
 
     for (grid_texture_handle, mut transform) in query.iter_mut() {
         let viewport = camera.logical_viewport_size().unwrap();
-        let top_left = camera
-            .viewport_to_world_2d(camera_transform, Vec2::new(0.0, viewport.y))
-            .unwrap();
-        let right_bottom = camera
-            .viewport_to_world_2d(camera_transform, Vec2::new(viewport.x, 0.0))
-            .unwrap();
+        let top_left = camera.viewport_to_world_2d(camera_transform, Vec2::new(0.0, viewport.y));
+        let right_bottom =
+            camera.viewport_to_world_2d(camera_transform, Vec2::new(viewport.x, 0.0));
+
+        if top_left.is_none() || right_bottom.is_none() {
+            continue;
+        }
+
+        let top_left = top_left.unwrap();
+        let right_bottom = right_bottom.unwrap();
+
         let grid_texture = materials.get_mut(grid_texture_handle).unwrap();
         let camera_world_size = (right_bottom - top_left).abs();
 

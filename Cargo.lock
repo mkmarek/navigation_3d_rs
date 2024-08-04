@@ -3590,6 +3590,23 @@ checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
 [[package]]
 name = "steering"
 version = "0.1.0"
+dependencies = [
+ "bevy_gizmos",
+ "bevy_math",
+ "bevy_render",
+ "geometry",
+]
+
+[[package]]
+name = "steering_test"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "example_utils",
+ "geometry",
+ "steering",
+]
 
 [[package]]
 name = "svg_fmt"

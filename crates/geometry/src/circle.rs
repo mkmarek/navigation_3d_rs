@@ -7,10 +7,88 @@ pub struct Circle {
     pub origin: Vec2,
 }
 
+#[derive(Debug)]
+pub enum SecondTangentPointResult {
+    None,
+    Point(f32),
+    TwoPoints(f32, f32),
+}
+
 impl Circle {
     #[must_use]
     pub fn new(radius: f32, origin: Vec2) -> Self {
         Self { radius, origin }
+    }
+
+    // Finds the second tangent of the circle from the first tangent and a desired direction
+    // of the second tangent.
+    // Returns parameter t, which is the distance from the origin of the first tangent to the
+    // origin of the second tangent.
+    // There can be always two tangents that lie on the given ray and are tangent to the circle
+    // with the given direction
+    pub fn find_tangent_on_ray(
+        &self,
+        first_tangent: &Ray2D,
+        direction: Vec2,
+    ) -> SecondTangentPointResult {
+        let first_tangent_length = first_tangent.direction.length();
+        let first_tangent_direction = first_tangent.direction.normalize();
+        let direction = direction.normalize();
+
+        if first_tangent_direction.dot(direction).abs() >= 0.9 {
+            return SecondTangentPointResult::None;
+        }
+
+        let denominator =
+            direction.x * first_tangent_direction.y - direction.y * first_tangent_direction.x;
+
+        if denominator.abs() < EPSILON {
+            return SecondTangentPointResult::None;
+        }
+
+        let numerator = direction.x * (first_tangent.origin.y - self.origin.y)
+            - direction.y * (first_tangent.origin.x - self.origin.x);
+
+        let t1 = -(numerator + self.radius) / denominator * first_tangent_length;
+        let t2 = -(numerator - self.radius) / denominator * first_tangent_length;
+
+        SecondTangentPointResult::TwoPoints(t1, t2)
+    }
+
+    // Finds the second tangent of the circle from the first tangent and a desired direction
+    // of the second tangent.
+    // Returns parameter t, which is the distance from the origin of the first tangent to the
+    // origin of the second tangent.
+    // There can be always two tangents that lie on the given line segment and are tangent to the circle
+    // with the given direction
+    pub fn find_tangent_on_line_segment(
+        &self,
+        first_tangent: &LineSegment2D,
+        direction: Vec2,
+    ) -> SecondTangentPointResult {
+        match self.find_tangent_on_ray(&first_tangent.to_ray(), direction) {
+            SecondTangentPointResult::None => SecondTangentPointResult::None,
+            SecondTangentPointResult::Point(t) => {
+                if first_tangent.t_min <= t && t <= first_tangent.t_max {
+                    SecondTangentPointResult::Point(t)
+                } else {
+                    SecondTangentPointResult::None
+                }
+            }
+            SecondTangentPointResult::TwoPoints(t1, t2) => {
+                if first_tangent.t_min <= t1 && t1 <= first_tangent.t_max {
+                    if first_tangent.t_min <= t2 && t2 <= first_tangent.t_max {
+                        SecondTangentPointResult::TwoPoints(t1, t2)
+                    } else {
+                        SecondTangentPointResult::Point(t1)
+                    }
+                } else if first_tangent.t_min <= t2 && t2 <= first_tangent.t_max {
+                    SecondTangentPointResult::Point(t2)
+                } else {
+                    SecondTangentPointResult::None
+                }
+            }
+        }
     }
 }
 
@@ -76,6 +154,8 @@ impl Ray2DIntersection for Circle {
             ))
         }
     }
+
+    //pub fn find_second_tangent(&self, ray: &Ray2D) -> Option<
 }
 
 impl Vec2Operations for Circle {
