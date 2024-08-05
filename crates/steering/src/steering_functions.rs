@@ -1,7 +1,7 @@
 use bevy_gizmos::gizmos::Gizmos;
 use bevy_math::Vec3;
 use bevy_render::color::Color;
-use geometry::{Ray3D, SecondTangentPointResult, Vec3Operations};
+use geometry::{Ray3D, SecondTangentPointResult};
 
 use crate::TurnPlane;
 
@@ -26,7 +26,6 @@ const LOOKAHEAD_TURN_MULTIPLIER: f32 = 1.1;
 pub fn arrive(
     target: Vec3,
     agent_position: Vec3,
-    agent_velocity: Vec3,
     agent_mass: f32,
     agent_max_force: f32,
     tolerance: f32,
@@ -44,11 +43,7 @@ pub fn arrive(
         Vec3::ZERO
     };
 
-    if (desired_velocity - agent_velocity).length() < f32::EPSILON {
-        return Vec3::ZERO;
-    }
-
-    (desired_velocity - agent_velocity).normalize() * agent_max_force
+    desired_velocity
 }
 
 /// Calculates the seek steering force for an agent.
@@ -63,13 +58,7 @@ pub fn arrive(
 /// # Returns
 ///
 /// * A Vec3 that represents the seek steering force.
-pub fn seek(
-    target: Vec3,
-    agent_position: Vec3,
-    agent_velocity: Vec3,
-    agent_max_force: f32,
-    tolerance: f32,
-) -> Vec3 {
+pub fn seek(target: Vec3, agent_position: Vec3, agent_max_force: f32, tolerance: f32) -> Vec3 {
     let displacement = target - agent_position;
 
     if displacement.length() < tolerance {
@@ -78,7 +67,7 @@ pub fn seek(
 
     let desired_velocity = displacement.normalize() * agent_max_force;
 
-    desired_velocity - agent_velocity
+    desired_velocity
 }
 
 pub enum FollowPathResult {
@@ -134,7 +123,6 @@ pub fn follow_path(
         return FollowPathResult::CurrentSegment(arrive(
             path[path_index + 1],
             agent_position,
-            agent_velocity,
             agent_mass,
             agent_max_force,
             position_tolerance,
@@ -159,7 +147,6 @@ pub fn follow_path(
         let seek_force = seek(
             lookahead_point,
             agent_position,
-            agent_velocity,
             agent_max_force,
             position_tolerance,
         );
@@ -194,7 +181,6 @@ pub fn follow_path(
         let arrive_force = arrive(
             path[path_index + 1],
             agent_position,
-            agent_velocity,
             agent_mass,
             agent_max_force,
             position_tolerance,
@@ -225,7 +211,6 @@ pub fn follow_path(
                 return FollowPathResult::CurrentSegment(arrive(
                     path[lookahead_index + 1],
                     agent_position,
-                    agent_velocity,
                     agent_mass,
                     agent_max_force,
                     position_tolerance,
@@ -248,7 +233,6 @@ pub fn follow_path(
     let seek_force = seek(
         lookahead_point,
         agent_position,
-        agent_velocity,
         agent_max_force,
         position_tolerance,
     );

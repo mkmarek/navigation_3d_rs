@@ -106,9 +106,9 @@ fn draw_gizmos(
     mut commands: Commands,
 ) {
     const TURNING_SPEED: f32 = 2.0;
-    const MAX_SPEED: f32 = 100.0;
-    const MAX_FORCE: f32 = 50.0;
-    const AGENT_MASS: f32 = 1.0;
+    const MAX_SPEED: f32 = 150.0;
+    const MAX_FORCE: f32 = 100.0;
+    const AGENT_MASS: f32 = 2.0;
 
     for (entity, mut velocity, mut path, mut transform) in query.iter_mut() {
         let follow_path_result = follow_path(
@@ -123,7 +123,7 @@ fn draw_gizmos(
             &mut gizmos,
         );
 
-        let force = match follow_path_result {
+        let desired_velocity = match follow_path_result {
             steering::FollowPathResult::CurrentSegment(force) => force,
             steering::FollowPathResult::NextSegment(force, segment) => {
                 path.path = path.path.split_off(segment);
@@ -142,13 +142,12 @@ fn draw_gizmos(
             MAX_SPEED,
             MAX_FORCE,
             AGENT_MASS,
-            force,
+            desired_velocity,
             time.delta_seconds(),
         );
 
         velocity.value = new_velocity;
         transform.rotation = new_rotation;
-
         transform.translation += velocity.value * time.delta_seconds();
 
         for i in 0..path.path.len() - 1 {
