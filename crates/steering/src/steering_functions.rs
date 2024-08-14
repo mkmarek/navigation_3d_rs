@@ -33,7 +33,7 @@ pub fn arrive(
     let displacement = target - agent_position;
     let distance = displacement.length();
 
-    let desired_velocity = if distance > tolerance {
+    if distance > tolerance {
         let max_acceleration = agent_max_force * ARRIVE_MAX_FORCE_USAGE_MULTIPLIER / agent_mass;
         let time = (2.0 * distance / max_acceleration).sqrt();
         let max_velocity = max_acceleration * time;
@@ -41,9 +41,7 @@ pub fn arrive(
         displacement.normalize() * max_velocity
     } else {
         Vec3::ZERO
-    };
-
-    desired_velocity
+    }
 }
 
 /// Calculates the seek steering force for an agent.
@@ -65,9 +63,7 @@ pub fn seek(target: Vec3, agent_position: Vec3, agent_max_force: f32, tolerance:
         return Vec3::ZERO;
     }
 
-    let desired_velocity = displacement.normalize() * agent_max_force;
-
-    desired_velocity
+    displacement.normalize() * agent_max_force
 }
 
 pub enum FollowPathResult {
@@ -242,4 +238,21 @@ pub fn follow_path(
     } else {
         FollowPathResult::NextSegment(seek_force, lookahead_index)
     }
+}
+
+pub fn separation(
+    current_position: Vec3,
+    agents: &[(Vec3, f32)],
+    separation_distance: f32,
+) -> Vec3 {
+    let mut separation_velocity = Vec3::ZERO;
+    for (agent_pos, agent_radius) in agents {
+        let separation_distance = agent_radius + separation_distance;
+        let diff = current_position - *agent_pos;
+        let distance = diff.length();
+        if distance < separation_distance {
+            separation_velocity += diff.normalize() * (separation_distance - distance);
+        }
+    }
+    separation_velocity
 }

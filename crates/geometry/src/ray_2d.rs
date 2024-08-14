@@ -1,6 +1,6 @@
 use bevy_math::Vec2;
 
-use crate::{line_segment_2d::LineSegment2D, EPSILON};
+use crate::{line_segment_2d::LineSegment2D, Vec2Operations, EPSILON};
 
 pub struct Ray2D {
     pub origin: Vec2,
@@ -93,5 +93,41 @@ impl Ray2DIntersection for Ray2D {
 
             Ray2DIntersectionResult::Point(-(slope * point.y - point.x + x_intercept) / denominator)
         }
+    }
+}
+
+impl Vec2Operations for Ray2D {
+    fn contains(&self, pt: Vec2) -> bool {
+        let relative_pt = pt - self.origin;
+        let projected_pt = relative_pt.dot(self.direction) * self.direction;
+
+        (projected_pt - relative_pt).length_squared() < EPSILON
+    }
+
+    fn constrain(&self, pt: Vec2) -> Vec2 {
+        let relative_pt = pt - self.origin;
+        let t = relative_pt.dot(self.direction);
+
+        self.origin + self.direction * t
+    }
+
+    fn closest_point_and_normal(&self, pt: Vec2) -> (Vec2, Vec2) {
+        let relative_pt = pt - self.origin;
+        let projected_pt = relative_pt.dot(self.direction) * self.direction;
+
+        let mut normal = self.direction.perp();
+
+        if (relative_pt - projected_pt).dot(normal) < 0.0 {
+            normal = -normal;
+        }
+
+        (self.origin + projected_pt, normal)
+    }
+
+    fn signed_distance(&self, pt: Vec2) -> f32 {
+        let relative_pt = pt - self.origin;
+        let t = relative_pt.dot(self.direction);
+
+        (self.origin + self.direction * t - pt).length()
     }
 }

@@ -1,5 +1,5 @@
 [package]
-name = "steering_test"
+name = "formation_test"
 version = "0.1.0"
 edition = "2021"
 
@@ -8,6 +8,7 @@ bevy = { version = "0.12.1" }
 example_utils = { path = "../utils" }
 geometry = { path = "../../crates/geometry" }
 steering = { path = "../../crates/steering" }
+coordination = { path = "../../crates/coordination" }
 orca = { path = "../../crates/orca" }
 bevy_egui = { version = "0.24.0" }
 rand = "0.8.5"

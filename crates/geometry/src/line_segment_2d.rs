@@ -31,50 +31,46 @@ impl Vec2Operations for LineSegment2D {
         let relative_pt = pt - self.origin;
         let t = relative_pt.dot(self.direction);
 
-        t >= (self.t_min - EPSILON) && t <= (self.t_max + EPSILON)
+        if t < self.t_min || t > self.t_max {
+            return false;
+        }
+
+        let projected_pt = t * self.direction;
+
+        (projected_pt - relative_pt).length_squared() < EPSILON
     }
 
     fn constrain(&self, pt: Vec2) -> Vec2 {
         let relative_pt = pt - self.origin;
-        let t = relative_pt.dot(self.direction);
+        let t = relative_pt
+            .dot(self.direction)
+            .clamp(self.t_min, self.t_max);
 
-        if t < self.t_min {
-            return self.origin + self.direction * self.t_min;
-        }
-
-        if t > self.t_max {
-            return self.origin + self.direction * self.t_max;
-        }
-
-        pt
+        self.origin + self.direction * t
     }
 
     fn closest_point_and_normal(&self, pt: Vec2) -> (Vec2, Vec2) {
         let relative_pt = pt - self.origin;
-        let t = relative_pt.dot(self.direction);
+        let t = relative_pt
+            .dot(self.direction)
+            .clamp(self.t_min, self.t_max);
 
-        if t < self.t_min {
-            return (self.origin + self.direction * self.t_min, -self.direction);
+        let projected_pt = t * self.direction;
+
+        let mut normal = self.direction.perp();
+
+        if (relative_pt - projected_pt).dot(normal) < 0.0 {
+            normal = -normal;
         }
 
-        if t > self.t_max {
-            return (self.origin + self.direction * self.t_max, self.direction);
-        }
-
-        (self.origin + self.direction * t, self.direction)
+        (self.origin + projected_pt, normal)
     }
 
     fn signed_distance(&self, pt: Vec2) -> f32 {
         let relative_pt = pt - self.origin;
-        let t = relative_pt.dot(self.direction);
-
-        if t < self.t_min {
-            return (self.origin + self.direction * self.t_min - pt).length();
-        }
-
-        if t > self.t_max {
-            return (self.origin + self.direction * self.t_max - pt).length();
-        }
+        let t = relative_pt
+            .dot(self.direction)
+            .clamp(self.t_min, self.t_max);
 
         (self.origin + self.direction * t - pt).length()
     }

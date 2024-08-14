@@ -1,6 +1,6 @@
 use bevy_math::Vec3;
 
-use crate::{InfiniteCone, Plane, Sphere, Vec3Operations};
+use crate::{Cone, Plane, Sphere, Vec3Operations};
 
 #[derive(Clone, Debug)]
 pub enum Collider {
@@ -16,19 +16,7 @@ impl Collider {
     #[must_use]
     pub fn get_secant_plane(&self, point: Vec3) -> Plane {
         match self {
-            Collider::Sphere(sphere) => {
-                let radius = sphere.radius;
-                let distance_from_point = point.length();
-                let side_length = (distance_from_point.powi(2) - radius.powi(2)).sqrt();
-                let angle = (radius / distance_from_point).asin();
-                let distance_to_plane = (side_length * angle.cos()).abs();
-
-                let direction = point.normalize();
-                let origin = direction * (distance_to_plane - distance_from_point).abs();
-                let normal = -direction;
-
-                Plane::new(origin, normal)
-            }
+            Collider::Sphere(sphere) => sphere.get_secant_plane(point),
         }
     }
 
@@ -57,8 +45,14 @@ impl Collider {
             Collider::Sphere(sphere) => {
                 let radius = sphere.radius;
                 let direction = -vertex;
-                InfiniteCone::new(vertex, direction, radius)
+                Cone::infinite(vertex, direction, radius)
             }
+        }
+    }
+
+    pub fn bounding_sphere(&self) -> Sphere {
+        match self {
+            Collider::Sphere(sphere) => sphere.clone(),
         }
     }
 }

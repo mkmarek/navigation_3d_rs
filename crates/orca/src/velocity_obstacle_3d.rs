@@ -10,6 +10,7 @@ pub struct VelocityObstacle3D {
     pub cutoff_shape: Collider,
     pub agent_velocity: Vec3,
     pub time_horizon: f32,
+    pub responsibility: f32,
 }
 
 impl VelocityObstacle3D {
@@ -21,6 +22,8 @@ impl VelocityObstacle3D {
         let relative_position = agent_other.position - agent_self.position;
         let relative_velocity = agent_self.velocity - agent_other.velocity;
         let agent_velocity = agent_self.velocity;
+        let total_responsibility = agent_self.responsibility + agent_other.responsibility;
+        let agent_self_responsibility = agent_self.responsibility / total_responsibility;
 
         Self {
             relative_position,
@@ -29,6 +32,7 @@ impl VelocityObstacle3D {
             cutoff_shape,
             agent_velocity,
             time_horizon,
+            responsibility: agent_self_responsibility,
         }
     }
 
@@ -92,6 +96,6 @@ impl VelocityObstacle3D {
             }
         };
 
-        Plane::new(self.agent_velocity + 0.5 * u, normal)
+        Plane::new(self.agent_velocity + self.responsibility * u, normal)
     }
 }

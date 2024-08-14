@@ -2,12 +2,14 @@
 
 pub(crate) const EPSILON: f32 = 0.0001;
 
+mod acceleration_velocity_obstacle_3d;
 mod agent_3d;
 mod solver_2d;
 mod solver_3d;
 mod solver_4d;
 mod velocity_obstacle_3d;
 
+pub use acceleration_velocity_obstacle_3d::*;
 pub use agent_3d::*;
 pub use velocity_obstacle_3d::*;
 
@@ -37,7 +39,7 @@ pub fn optimize_velocity_3d(
             for plane in planes {
                 let hyperplane = Hyperplane::new(
                     Vec4::new(plane.origin.x, plane.origin.y, plane.origin.z, 0.0),
-                    Vec4::new(plane.normal.x, plane.normal.y, plane.normal.z, 0.2),
+                    Vec4::new(plane.normal.x, plane.normal.y, plane.normal.z, 0.5),
                 );
 
                 hyperplanes.push(hyperplane);

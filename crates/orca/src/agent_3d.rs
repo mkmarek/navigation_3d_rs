@@ -7,6 +7,7 @@ pub struct Agent3D {
     pub position: Vec3,
     pub velocity: Vec3,
     pub shape: Collider,
+    pub responsibility: f32,
 }
 
 impl Agent3D {
@@ -16,6 +17,7 @@ impl Agent3D {
             position,
             velocity,
             shape,
+            responsibility: 0.5,
         }
     }
 }

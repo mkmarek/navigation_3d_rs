@@ -1379,6 +1379,11 @@ dependencies = [
 [[package]]
 name = "coordination"
 version = "0.1.0"
+dependencies = [
+ "bevy_gizmos",
+ "bevy_math",
+ "bevy_render",
+]
 
 [[package]]
 name = "core-foundation"
@@ -1719,6 +1724,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "example_avo_visualization"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "example_utils",
+ "geometry",
+ "orca",
+]
+
+[[package]]
 name = "example_spherinder_crossection_test"
 version = "0.1.0"
 dependencies = [
@@ -1830,6 +1846,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "formation_test"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "coordination",
+ "example_utils",
+ "geometry",
+ "orca",
+ "rand",
+ "steering",
 ]
 
 [[package]]
@@ -3605,6 +3635,8 @@ dependencies = [
  "bevy_egui",
  "example_utils",
  "geometry",
+ "orca",
+ "rand",
  "steering",
 ]
 
