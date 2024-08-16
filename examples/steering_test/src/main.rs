@@ -4,7 +4,7 @@ use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 use example_utils::{CameraTarget, UniversalCamera, UniversalCameraPlugin, UtilsPlugin};
 use geometry::{colliders::Collider, Plane, Sphere, Vec3Operations};
-use orca::{optimize_velocity_3d, Agent3D, VelocityObstacle3D};
+use orca::{optimize_velocity_3d, AccelerationVelocityObstacle3D, Agent3D, VelocityObstacle3D};
 use rand::{thread_rng, Rng};
 use steering::{follow_path, separation, update_agent_on_path, FollowPathResult};
 
@@ -50,6 +50,7 @@ const TURNING_SPEED: f32 = 2.0;
 const MAX_SPEED: f32 = 80.0;
 const MAX_FORCE: f32 = 50.0;
 const AGENT_MASS: f32 = 2.0;
+const MAX_ACCELERATION: f32 = MAX_FORCE / AGENT_MASS;
 const AGENT_RADIUS: f32 = 5.0;
 const SEPARATION_RADIUS: f32 = AGENT_RADIUS * 1.5;
 const ORCA_RADIUS: f32 = SEPARATION_RADIUS * 1.1;
@@ -146,7 +147,7 @@ fn setup(
                     })
                     .insert(Obstacle {
                         radius,
-                        collider: Sphere::new(radius * 1.5, Vec3::new(x, y, z)),
+                        collider: Sphere::new(radius, Vec3::new(x, y, z)),
                     });
             }
         }
@@ -255,8 +256,14 @@ fn draw_gizmos(
                         Color::WHITE,
                     );
 
-                    VelocityObstacle3D::new(&self_agent, &other_agent, time_horizon)
-                        .orca_plane(time.delta_seconds())
+                    AccelerationVelocityObstacle3D::new(
+                        &self_agent,
+                        &other_agent,
+                        time_horizon,
+                        2.0 * MAX_SPEED / MAX_ACCELERATION,
+                        25,
+                    )
+                    .orca_plane(time.delta_seconds())
                 })
                 .collect::<Vec<Plane>>();
 
@@ -268,17 +275,28 @@ fn draw_gizmos(
                 )
             }
 
-            let mut optimal_velocity =
-                optimize_velocity_3d(desired_velocity, MAX_SPEED, orca_planes.as_slice());
+            let mut optimal_velocity = optimize_velocity_3d(
+                desired_velocity - velocity.value,
+                MAX_ACCELERATION * 2.0 * MAX_SPEED / MAX_ACCELERATION,
+                orca_planes.as_slice(),
+            );
 
             if optimal_velocity.length() < desired_velocity.length() * 0.2 {
                 let desired_velocity = desired_velocity.cross(Vec3::Y);
 
-                optimal_velocity =
-                    optimize_velocity_3d(desired_velocity, MAX_SPEED, orca_planes.as_slice());
+                optimal_velocity = optimize_velocity_3d(
+                    desired_velocity - velocity.value,
+                    MAX_ACCELERATION * 2.0 * MAX_SPEED / MAX_ACCELERATION,
+                    orca_planes.as_slice(),
+                );
             }
 
-            desired_velocity = optimal_velocity;
+            println!(
+                "Optimal velocity: {:?}, Desired velocity: {:?}",
+                optimal_velocity, desired_velocity
+            );
+
+            desired_velocity = velocity.value + optimal_velocity;
         }
 
         let (new_velocity, new_rotation) = update_agent_on_path(

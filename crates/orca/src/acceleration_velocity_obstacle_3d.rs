@@ -258,7 +258,7 @@ impl AccelerationVelocityObstacle3D {
 
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn orca_plane(&self, time_step: f32, gizmos: &mut Gizmos) -> Plane {
+    pub fn orca_plane(&self, time_step: f32) -> Plane {
         let radius = self.shape.bounding_sphere().radius;
 
         // Collision
@@ -345,34 +345,7 @@ impl AccelerationVelocityObstacle3D {
                 self.discrete_steps,
             );
 
-            //for boundary in &boundary {
-            //    match boundary {
-            //        AVOBoundary::LineSegment(line_segment) => {
-            //            let from =
-            //                line_segment.origin + line_segment.direction * line_segment.t_min;
-            //            let to = line_segment.origin + line_segment.direction * line_segment.t_max;
-
-            //            let from_3d = plane.project_3d(from);
-            //            let to_3d = plane.project_3d(to);
-
-            //            gizmos.line(from_3d, to_3d, Color::RED);
-            //        }
-            //        AVOBoundary::Arc(arc) => {
-            //            for i in 0..10_u16 {
-            //                let t1 = arc.point_at(f32::from(i) / 10.0);
-            //                let t2 = arc.point_at(f32::from(i + 1) / 10.0);
-
-            //                let t1_3d = plane.project_3d(t1);
-            //                let t2_3d = plane.project_3d(t2);
-
-            //                gizmos.line(t1_3d, t2_3d, Color::RED);
-            //            }
-            //        }
-            //    }
-            //}
-
             let (mut u, mut normal) = boundary[0].closest_point_and_normal(v_ab);
-            let mut selected_index = 0;
 
             for (i, boundary) in boundary.iter().enumerate().skip(1) {
                 let (p, n) = boundary.closest_point_and_normal(v_ab);
@@ -380,35 +353,11 @@ impl AccelerationVelocityObstacle3D {
                 if (p - v_ab).length_squared() < (u - v_ab).length_squared() {
                     u = p;
                     normal = n;
-                    selected_index = i;
                 }
             }
 
             let u = plane.project_3d(u);
             let normal = plane.project_3d(normal);
-
-            match &boundary[selected_index] {
-                AVOBoundary::LineSegment(line_segment) => {
-                    let from = line_segment.origin + line_segment.direction * line_segment.t_min;
-                    let to = line_segment.origin + line_segment.direction * line_segment.t_max;
-
-                    let from_3d = plane.project_3d(from);
-                    let to_3d = plane.project_3d(to);
-
-                    gizmos.line(from_3d, to_3d, Color::YELLOW);
-                }
-                AVOBoundary::Arc(arc) => {
-                    for i in 0..10_u16 {
-                        let t1 = arc.point_at(f32::from(i) / 10.0);
-                        let t2 = arc.point_at(f32::from(i + 1) / 10.0);
-
-                        let t1_3d = plane.project_3d(t1);
-                        let t2_3d = plane.project_3d(t2);
-
-                        gizmos.line(t1_3d, t2_3d, Color::YELLOW);
-                    }
-                }
-            }
 
             (u - self.relative_velocity, normal)
         };

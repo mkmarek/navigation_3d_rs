@@ -24,8 +24,6 @@ impl Arc2D {
             (radius.powi(2) - (distance / 2.0).powi(2)).sqrt()
         };
 
-        println!("perpendicular_component: {}", perpendicular_component);
-
         let center_a = midpoint + perpendicular_a * perpendicular_component;
         let center_b = midpoint + perpendicular_b * perpendicular_component;
 
