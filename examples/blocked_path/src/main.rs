@@ -1,11 +1,10 @@
-use std::{f32::consts, ops::Range};
+use std::f32::consts;
 
 use bevy::prelude::*;
 use bevy_egui::EguiPlugin;
 use example_utils::{CameraTarget, UniversalCamera, UniversalCameraPlugin, UtilsPlugin};
 use geometry::{colliders::Collider, Plane, Sphere, Vec3Operations};
 use orca::{optimize_velocity_3d, AccelerationVelocityObstacle3D, Agent3D};
-use rand::{thread_rng, Rng};
 use steering::{follow_path, separation, update_agent_on_path, FollowPathResult};
 
 #[derive(Component)]
@@ -40,12 +39,10 @@ fn main() {
             EguiPlugin,
         ))
         .add_systems(Startup, setup)
-        .add_systems(Update, (draw_gizmos, generate_path))
+        .add_systems(Update, draw_gizmos)
         .run();
 }
 
-const BOX_SIZE: f32 = 500.0;
-const NUMBER_OF_OBSTACLES: usize = 8;
 const TURNING_SPEED: f32 = 2.0;
 const MAX_SPEED: f32 = 80.0;
 const MAX_FORCE: f32 = 50.0;
@@ -55,7 +52,6 @@ const AGENT_RADIUS: f32 = 5.0;
 const SEPARATION_RADIUS: f32 = AGENT_RADIUS * 1.5;
 const ORCA_RADIUS: f32 = SEPARATION_RADIUS * 1.1;
 const NUMBER_OF_NEIGHBORS: usize = 20;
-const OBSTACLE_RADIUS: Range<f32> = 10.0..20.0;
 
 fn setup(
     mut commands: Commands,
@@ -86,6 +82,9 @@ fn setup(
             ..Default::default()
         })
         .insert(Velocity { value: Vec3::ZERO })
+        .insert(FollowPath {
+            path: vec![initial_position, Vec3::new(1000.0, 0.0, 0.0)],
+        })
         .insert(Agent)
         .id();
 
@@ -115,67 +114,27 @@ fn setup(
         ))
         .add_child(light);
 
-    let mut rng = thread_rng();
-
-    for x in 0..NUMBER_OF_OBSTACLES {
-        for y in 0..NUMBER_OF_OBSTACLES {
-            for z in 0..NUMBER_OF_OBSTACLES {
-                let x = x as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
-                let y = y as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
-                let z = z as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
-
-                let x = x + rng.gen_range(-50.0..50.0);
-                let y = y + rng.gen_range(-50.0..50.0);
-                let z = z + rng.gen_range(-50.0..50.0);
-                let radius = rng.gen_range(OBSTACLE_RADIUS);
-
-                commands
-                    .spawn(PbrBundle {
-                        mesh: meshes.add(
-                            shape::UVSphere {
-                                radius,
-                                ..Default::default()
-                            }
-                            .into(),
-                        ),
-                        material: standard_materials.add(StandardMaterial {
-                            base_color: Color::rgb(0.5, 0.5, 0.5),
-                            ..Default::default()
-                        }),
-                        transform: Transform::from_translation(Vec3::new(x, y, z)),
-                        ..Default::default()
-                    })
-                    .insert(Obstacle {
-                        radius,
-                        collider: Sphere::new(radius, Vec3::new(x, y, z)),
-                    });
-            }
-        }
-    }
-}
-
-fn generate_path(
-    mut commands: Commands,
-    query: Query<(Entity, &Transform, &Agent), Without<FollowPath>>,
-) {
-    let mut rng = thread_rng();
-
-    for (entity, transform, _) in query.iter() {
-        let path_length = rng.gen_range(5..10);
-
-        let mut path = vec![];
-        path.push(transform.translation);
-
-        for _ in 0..path_length {
-            path.push(Vec3::new(
-                rng.gen_range(0.0..BOX_SIZE),
-                rng.gen_range(0.0..BOX_SIZE),
-                rng.gen_range(0.0..BOX_SIZE),
-            ));
-        }
-
-        commands.entity(entity).insert(FollowPath { path });
-    }
+    let radius = 100.0;
+    commands
+        .spawn(PbrBundle {
+            mesh: meshes.add(
+                shape::UVSphere {
+                    radius,
+                    ..Default::default()
+                }
+                .into(),
+            ),
+            material: standard_materials.add(StandardMaterial {
+                base_color: Color::rgb(0.5, 0.5, 0.5),
+                ..Default::default()
+            }),
+            transform: Transform::from_translation(Vec3::new(400.0, 0.0, 0.0)),
+            ..Default::default()
+        })
+        .insert(Obstacle {
+            radius,
+            collider: Sphere::new(radius, Vec3::new(400.0, 0.0, 0.0)),
+        });
 }
 
 fn draw_gizmos(
@@ -190,7 +149,11 @@ fn draw_gizmos(
             let distance = t.translation.distance(transform.translation);
 
             if distance < AGENT_RADIUS + obstacle.radius {
-                println!("Collision detected!");
+                println!(
+                    "Collision detected! {} < {}",
+                    distance,
+                    AGENT_RADIUS + obstacle.radius
+                );
             }
         }
 
@@ -223,8 +186,6 @@ fn draw_gizmos(
             }
         };
 
-        println!("Desired velocity: {:?}", desired_velocity);
-
         let time_horizon = MAX_SPEED / (MAX_FORCE / AGENT_MASS);
         let mut nearest_neighbors = obstacles.iter().collect::<Vec<_>>();
 
@@ -250,7 +211,7 @@ fn draw_gizmos(
                 let mut other_agent = Agent3D::new(
                     a.0.translation,
                     Vec3::ZERO,
-                    Collider::Sphere(Sphere::new(a.1.collider.radius, Vec3::ZERO)),
+                    Collider::Sphere(Sphere::new(a.1.collider.radius * 1.1, Vec3::ZERO)),
                 );
 
                 other_agent.responsibility = 0.0;
@@ -277,13 +238,38 @@ fn draw_gizmos(
             })
             .collect::<Vec<Plane>>();
 
+        {
+            for plane in orca_planes.iter() {
+                gizmos.line(
+                    transform.translation + plane.origin,
+                    transform.translation + plane.origin + plane.normal * 100.0,
+                    Color::RED,
+                );
+
+                gizmos.sphere(
+                    transform.translation + plane.origin,
+                    Quat::IDENTITY,
+                    50.0,
+                    Color::RED,
+                );
+
+                let t = Transform::from_translation(Vec3::new(0.0, 0.0, 0.0))
+                    .looking_to(plane.normal, Vec3::Y);
+
+                gizmos.rect(
+                    transform.translation + plane.origin,
+                    t.rotation,
+                    Vec2::ONE * 100.0,
+                    Color::RED,
+                );
+            }
+        }
+
         let optimal_velocity = optimize_velocity_3d(
             desired_velocity - velocity.value,
             MAX_ACCELERATION * 2.0 * MAX_SPEED / MAX_ACCELERATION,
             orca_planes.as_slice(),
         );
-
-        println!("Optimal velocity: {:?}", optimal_velocity);
 
         desired_velocity = velocity.value + optimal_velocity;
 

@@ -217,7 +217,7 @@ fn draw_velocity_obstacle(agent_information: Res<AgentInformation>, mut gizmos: 
         25,
     );
 
-    let orca = avo.orca_plane(0.1);
+    let orca = avo.orca_plane(0.1, &mut gizmos, agent_information.position_a);
 
     gizmos.sphere(
         orca.origin + agent_information.position_a,

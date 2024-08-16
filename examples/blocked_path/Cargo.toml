@@ -1,0 +1,14 @@
+[package]
+name = "example_blocked_path"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.12.1" }
+example_utils = { path = "../utils" }
+geometry = { path = "../../crates/geometry" }
+steering = { path = "../../crates/steering" }
+orca = { path = "../../crates/orca" }
+bevy_egui = { version = "0.24.0" }
+rand = "0.8.5"
+

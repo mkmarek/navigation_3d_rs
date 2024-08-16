@@ -87,6 +87,10 @@ impl Sphere {
 
         Some(Circle::new(radius, plane_pt_2d))
     }
+
+    pub fn is_inside(&self, other: &Sphere) -> bool {
+        self.origin.distance(other.origin) + self.radius <= other.radius
+    }
 }
 
 pub trait SphereMinkowskiSum {

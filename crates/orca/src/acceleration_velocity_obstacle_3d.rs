@@ -1,8 +1,8 @@
 use bevy_gizmos::gizmos::Gizmos;
-use bevy_math::{Mat2, Vec2, Vec3};
+use bevy_math::{Mat2, Quat, Vec2, Vec3};
 use bevy_render::color::Color;
 use geometry::{
-    colliders::Collider, Arc2D, LineSegment2D, LineSegment2DIntersection,
+    colliders::Collider, Arc2D, Cone, LineSegment2D, LineSegment2DIntersection,
     LineSegment2DIntersectionResult, Ray2DIntersection, Ray2DIntersectionResult, Sphere,
     Vec2Operations, Vec3Operations,
 };
@@ -258,31 +258,91 @@ impl AccelerationVelocityObstacle3D {
 
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn orca_plane(&self, time_step: f32) -> Plane {
+    pub fn orca_plane(&self, time_step: f32, gizmos: &mut Gizmos, offset: Vec3) -> Plane {
         let radius = self.shape.bounding_sphere().radius;
+        let shape_sphere = Sphere::new(radius, Vec3::ZERO);
 
+        let cutoff_ct = Self::avo_center(
+            self.acc_control_param,
+            self.relative_velocity,
+            self.relative_position,
+            self.time_horizon,
+        );
+
+        let cutoff_radius = radius * Self::scale_factor(self.acc_control_param, self.time_horizon);
+        gizmos.sphere(
+            cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+            Quat::IDENTITY,
+            cutoff_radius,
+            Color::GREEN,
+        );
         // Collision
-        let (u, normal) = if self.shape.contains(self.relative_position) {
+        let (u, normal) = if shape_sphere.contains(self.relative_position) {
             // project on a cutoff plane at time_step
-            let cutoff_center = Self::avo_center(
+            let time_step_ct = Self::avo_center(
                 self.acc_control_param,
                 self.relative_velocity,
                 self.relative_position,
                 time_step,
             );
 
-            let cutoff_scale_factor = Self::scale_factor(self.acc_control_param, time_step);
+            let cutoff_ct = Self::avo_center(
+                self.acc_control_param,
+                self.relative_velocity,
+                self.relative_position,
+                self.time_horizon,
+            );
 
-            let time_step_cutoff_shape = self.shape.scale(cutoff_scale_factor);
-            let from_cutoff_center_to_relative_velocity = self.relative_velocity - cutoff_center;
+            let time_step_radius = radius * Self::scale_factor(self.acc_control_param, time_step);
+            let cutoff_radius =
+                radius * Self::scale_factor(self.acc_control_param, self.time_horizon);
 
-            let (p, normal) = time_step_cutoff_shape
-                .closest_point_and_normal(from_cutoff_center_to_relative_velocity);
+            let direction_from_cutoff_to_time_step = (time_step_ct - cutoff_ct).normalize_or_zero();
+            let direction_from_relative_velocity_to_cutoff =
+                (cutoff_ct - self.relative_velocity).normalize_or_zero();
 
-            // p is relative to cutoff center, we need to make it relative to relative_velocity
-            let u = p + cutoff_center - self.relative_velocity;
+            gizmos.sphere(
+                cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+                Quat::IDENTITY,
+                cutoff_radius,
+                Color::GREEN,
+            );
 
-            (u, normal)
+            gizmos.sphere(
+                time_step_ct - self.relative_velocity + offset + self.agent_velocity,
+                Quat::IDENTITY,
+                time_step_radius,
+                Color::WHITE,
+            );
+
+            draw_truncated_cone(
+                gizmos,
+                cutoff_radius,
+                cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+                time_step_radius,
+                time_step_ct - self.relative_velocity + offset + self.agent_velocity,
+            );
+
+            let dt_sphere = Sphere::new(time_step_radius, time_step_ct);
+            let cutoff_sphere = Sphere::new(cutoff_radius, cutoff_ct);
+
+            if cutoff_sphere.is_inside(&dt_sphere) {
+                let (p, normal) = dt_sphere.closest_point_and_normal(self.relative_velocity);
+
+                (p - self.relative_velocity, normal)
+            } else if direction_from_cutoff_to_time_step
+                .dot(direction_from_relative_velocity_to_cutoff)
+                > 0.0
+            {
+                let cone = Cone::new(cutoff_radius, cutoff_ct, time_step_radius, time_step_ct);
+                let (p, normal) = cone.closest_point_and_normal(self.relative_velocity);
+
+                (p - self.relative_velocity, normal)
+            } else {
+                let cutoff = Sphere::new(cutoff_radius, cutoff_ct);
+                let (p, normal) = cutoff.closest_point_and_normal(self.relative_velocity);
+                (p - self.relative_velocity, normal)
+            }
         } else if self.relative_velocity.length_squared() < EPSILON {
             let cutoff_sphere = {
                 let cutoff_center = Self::avo_center(
@@ -313,9 +373,9 @@ impl AccelerationVelocityObstacle3D {
                     .length_squared()
                     < EPSILON
                 {
-                    let p1_dot_x = p1.dot(Vec3::X);
-                    let p1_dot_y = p1.dot(Vec3::Y);
-                    let p1_dot_z = p1.dot(Vec3::Z);
+                    let p1_dot_x = p1.normalize().dot(Vec3::X);
+                    let p1_dot_y = p1.normalize().dot(Vec3::Y);
+                    let p1_dot_z = p1.normalize().dot(Vec3::Z);
 
                     let basis =
                         if p1_dot_x.abs() < p1_dot_y.abs() && p1_dot_x.abs() < p1_dot_z.abs() {
@@ -345,9 +405,35 @@ impl AccelerationVelocityObstacle3D {
                 self.discrete_steps,
             );
 
+            for boundary in &boundary {
+                match boundary {
+                    AVOBoundary::LineSegment(line_segment) => {
+                        let from =
+                            line_segment.origin + line_segment.direction * line_segment.t_min;
+                        let to = line_segment.origin + line_segment.direction * line_segment.t_max;
+
+                        let from_3d = plane.project_3d(from);
+                        let to_3d = plane.project_3d(to);
+
+                        gizmos.line(from_3d, to_3d, Color::RED);
+                    }
+                    AVOBoundary::Arc(arc) => {
+                        for i in 0..10_u16 {
+                            let t1 = arc.point_at(f32::from(i) / 10.0);
+                            let t2 = arc.point_at(f32::from(i + 1) / 10.0);
+
+                            let t1_3d = plane.project_3d(t1);
+                            let t2_3d = plane.project_3d(t2);
+
+                            gizmos.line(t1_3d, t2_3d, Color::RED);
+                        }
+                    }
+                }
+            }
+
             let (mut u, mut normal) = boundary[0].closest_point_and_normal(v_ab);
 
-            for (i, boundary) in boundary.iter().enumerate().skip(1) {
+            for boundary in boundary.iter().skip(1) {
                 let (p, n) = boundary.closest_point_and_normal(v_ab);
 
                 if (p - v_ab).length_squared() < (u - v_ab).length_squared() {
@@ -362,7 +448,7 @@ impl AccelerationVelocityObstacle3D {
             (u - self.relative_velocity, normal)
         };
 
-        Plane::new(self.agent_velocity + self.responsibility * u, normal)
+        Plane::new(self.responsibility * u, normal)
     }
 
     fn avo_center(
@@ -380,5 +466,64 @@ impl AccelerationVelocityObstacle3D {
         let param = acc_control_param * ((-t / acc_control_param).exp() - 1.0);
 
         (t + param).recip()
+    }
+}
+
+#[allow(dead_code)]
+fn draw_truncated_cone(
+    gizmos: &mut Gizmos,
+    front_radius: f32,
+    front_position: Vec3,
+    back_radius: f32,
+    back_position: Vec3,
+) {
+    const SEGMENTS: usize = 32;
+
+    let direction = (back_position - front_position).normalize();
+
+    // Draw front base
+    gizmos.circle(
+        front_position,
+        direction.normalize(),
+        front_radius,
+        Color::RED,
+    );
+
+    // Draw back base
+    gizmos.circle(
+        back_position,
+        direction.normalize(),
+        back_radius,
+        Color::RED,
+    );
+
+    let dot_x = Vec3::X.dot(direction.normalize());
+    let dot_y = Vec3::Y.dot(direction.normalize());
+    let dot_z = Vec3::Z.dot(direction.normalize());
+
+    let basis_angle = if dot_x.abs() < dot_y.abs() && dot_x.abs() < dot_z.abs() {
+        Vec3::X
+    } else if dot_y.abs() < dot_z.abs() {
+        Vec3::Y
+    } else {
+        Vec3::Z
+    };
+
+    // Draw sides
+    for i in 0..SEGMENTS {
+        let angle = i as f32 / SEGMENTS as f32 * std::f32::consts::TAU;
+        let perp_1 = direction.cross(basis_angle).normalize();
+        let perp_2 = direction.cross(perp_1).normalize();
+
+        let start = front_position
+            + direction
+            + (angle.cos() * front_radius * perp_1)
+            + (angle.sin() * front_radius * perp_2);
+        let end = back_position
+            + direction
+            + (angle.cos() * back_radius * perp_1)
+            + (angle.sin() * back_radius * perp_2);
+
+        gizmos.line(start, end, Color::RED);
     }
 }
