@@ -217,35 +217,7 @@ fn draw_velocity_obstacle(agent_information: Res<AgentInformation>, mut gizmos: 
         25,
     );
 
-    //for cone in &avo.cones {
-    //    draw_truncated_cone(
-    //        &mut gizmos,
-    //        cone.radius * cone.min_height.unwrap(),
-    //        agent_information.position_a + cone.vertex + cone.direction * cone.min_height.unwrap(),
-    //        cone.radius * cone.max_height.unwrap_or(100000.0),
-    //        agent_information.position_a
-    //            + cone.vertex
-    //            + cone.direction * cone.max_height.unwrap_or(100000.0),
-    //    );
-    //}
-
-    for circle in &avo.circles {
-        gizmos.circle(
-            circle.origin + agent_information.position_a,
-            circle.normal,
-            circle.radius,
-            Color::BLUE,
-        );
-    }
-
-    gizmos.sphere(
-        avo.cutoff.origin + agent_information.position_a,
-        Quat::IDENTITY,
-        avo.cutoff.radius,
-        Color::BLUE,
-    );
-
-    let orca = avo.orca_plane(0.1);
+    let orca = avo.orca_plane(0.1, &mut gizmos);
 
     gizmos.sphere(
         orca.origin + agent_information.position_a,

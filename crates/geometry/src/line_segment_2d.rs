@@ -1,7 +1,8 @@
 use bevy_math::Vec2;
 
-use crate::{Ray2D, Vec2Operations, EPSILON};
+use crate::{Ray2D, Ray2DIntersection, Ray2DIntersectionResult, Vec2Operations, EPSILON};
 
+#[derive(Debug)]
 pub struct LineSegment2D {
     pub origin: Vec2,
     pub direction: Vec2,
@@ -21,8 +22,23 @@ impl LineSegment2D {
         }
     }
 
+    #[must_use]
+    pub fn from_two_points(p1: Vec2, p2: Vec2) -> Self {
+        let direction = p2 - p1;
+        let t_min = 0.0;
+        let t_max = direction.length();
+
+        let direction = direction / t_max;
+
+        Self::new(p1, direction, t_min, t_max)
+    }
+
     pub fn to_ray(&self) -> Ray2D {
         Ray2D::new(self.origin, self.direction)
+    }
+
+    pub fn end(&self) -> Vec2 {
+        self.origin + self.direction * self.t_max
     }
 }
 
@@ -73,5 +89,58 @@ impl Vec2Operations for LineSegment2D {
             .clamp(self.t_min, self.t_max);
 
         (self.origin + self.direction * t - pt).length()
+    }
+}
+
+// Represents the result of a 2D ray intersection.
+// None: No intersection.
+// One: One intersection at the parameter t.
+// Two: Two intersections at the parameters t1 and t2.
+//
+// The parameters t, t1 and t2 represent the distance from the ray origin to the intersection point, they scale with the norm of the direction vector.
+// The intersection point is calculated as origin + direction * t.
+pub enum LineSegment2DIntersectionResult {
+    None,
+    Point(f32),
+    LineSegment(LineSegment2D),
+}
+
+// Represents an object that can be intersected by a 2D ray.
+pub trait LineSegment2DIntersection {
+    fn intersect(&self, line: &LineSegment2D) -> LineSegment2DIntersectionResult;
+}
+
+impl LineSegment2DIntersection for LineSegment2D {
+    fn intersect(&self, line: &LineSegment2D) -> LineSegment2DIntersectionResult {
+        let ray_1 = self.to_ray();
+        let ray_2 = line.to_ray();
+
+        let result = ray_1.intersect(&ray_2);
+
+        match result {
+            Ray2DIntersectionResult::None => LineSegment2DIntersectionResult::None,
+            Ray2DIntersectionResult::Point(t) => {
+                if t < self.t_min || t > self.t_max {
+                    LineSegment2DIntersectionResult::None
+                } else {
+                    LineSegment2DIntersectionResult::Point(t)
+                }
+            }
+            Ray2DIntersectionResult::LineSegment(line) => {
+                let t_min = line.t_min.clamp(self.t_min, self.t_max);
+                let t_max = line.t_max.clamp(self.t_min, self.t_max);
+
+                if t_min > t_max || (t_max - t_min).abs() < EPSILON {
+                    LineSegment2DIntersectionResult::None
+                } else {
+                    LineSegment2DIntersectionResult::LineSegment(LineSegment2D::new(
+                        self.origin,
+                        self.direction,
+                        t_min,
+                        t_max,
+                    ))
+                }
+            }
+        }
     }
 }

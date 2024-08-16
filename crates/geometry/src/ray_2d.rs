@@ -47,11 +47,11 @@ impl Ray2DIntersection for Ray2D {
 
         // Before calculating slope we need to check if the direction vector is vertical
         if other_direction.x.abs() <= EPSILON {
-            // if the line is vertical the whole line lies on the point x = other_point.x
+            // if the line is horizontal the whole line lies on the point y = other_point.y
             // therefore the parameter t will be:
             Ray2DIntersectionResult::Point((other_point.x - point.x) / direction.x)
         } else if other_direction.y.abs() <= EPSILON {
-            // if the line is horizontal the whole line lies on the point y = other_point.y
+            // if the line is vertical the whole line lies on the point x = other_point.x
             // therefore the parameter t will be:
             Ray2DIntersectionResult::Point((other_point.y - point.y) / direction.y)
         } else if other_direction.x.abs() > other_direction.y.abs() {

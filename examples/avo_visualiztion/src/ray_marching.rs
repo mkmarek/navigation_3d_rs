@@ -207,7 +207,7 @@ impl FromWorld for RayMarchingPipeline {
     }
 }
 
-#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType)]
+#[derive(Component, Default, Clone, Copy, ExtractComponent, ShaderType, Debug)]
 pub struct RayMarchData {
     pub projection: Mat4,
     pub projection_inverse: Mat4,

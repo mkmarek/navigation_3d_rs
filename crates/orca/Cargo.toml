@@ -6,7 +6,5 @@ edition = "2021"
 [dependencies]
 bevy_math = { workspace = true }
 geometry = { path = "../geometry" }
-
-# Dependencies for rendering gizmos
-bevy_gizmos = { workspace = true, optional = true }
-bevy_render = { workspace = true, optional = true }
+bevy_gizmos = { workspace = true }
+bevy_render = { workspace = true }

@@ -1,6 +1,10 @@
-use bevy_math::Vec3;
+use bevy_gizmos::gizmos::Gizmos;
+use bevy_math::{Mat2, Vec2, Vec3};
+use bevy_render::color::Color;
 use geometry::{
-    colliders::Collider, Circle3d, Cone, Sphere, SphereSphereIntersection, Vec3Operations,
+    colliders::Collider, Arc2D, LineSegment2D, LineSegment2DIntersection,
+    LineSegment2DIntersectionResult, Ray2DIntersection, Ray2DIntersectionResult, Sphere,
+    Vec2Operations, Vec3Operations,
 };
 
 use crate::{Agent3D, Plane, EPSILON};
@@ -13,11 +17,215 @@ pub struct AccelerationVelocityObstacle3D {
     pub time_horizon: f32,
     pub acc_control_param: f32,
     pub responsibility: f32,
-    pub discrete_steps: usize,
-    pub cutoff: Sphere,
-    pub cutoff_secant_plane: Plane,
-    pub cones: Vec<Cone>,
-    pub circles: Vec<Circle3d>,
+    pub discrete_steps: u16,
+}
+
+#[derive(Debug)]
+enum AVOBoundary {
+    LineSegment(LineSegment2D),
+    Arc(Arc2D),
+}
+
+impl AVOBoundary {
+    pub fn new(
+        v_ab: Vec2,
+        p_ab: Vec2,
+        radius: f32,
+        time_horizon: f32,
+        acc_control_param: f32,
+        discrete_steps: u16,
+    ) -> Vec<AVOBoundary> {
+        let mut left_boundary = Vec::with_capacity(discrete_steps as usize);
+        let mut right_boundary = Vec::with_capacity(discrete_steps as usize);
+
+        for i in 0..discrete_steps {
+            let t1 = Self::lerp(
+                0.001,
+                time_horizon,
+                f32::from(i) / f32::from(discrete_steps),
+            );
+            let t2 = Self::lerp(
+                0.001,
+                time_horizon,
+                f32::from(i + 1) / f32::from(discrete_steps),
+            );
+
+            let p1 = Self::boundary(t1, acc_control_param, radius, v_ab, p_ab, 1.0);
+            let p2 = Self::boundary(t2, acc_control_param, radius, v_ab, p_ab, 1.0);
+
+            if !p1.is_nan() && !p2.is_nan() && p1.distance_squared(p2) > EPSILON {
+                let line_segment = LineSegment2D::from_two_points(p1, p2);
+                left_boundary.push(line_segment);
+            }
+
+            let p1 = Self::boundary(t1, acc_control_param, radius, v_ab, p_ab, -1.0);
+            let p2 = Self::boundary(t2, acc_control_param, radius, v_ab, p_ab, -1.0);
+
+            if !p1.is_nan() && !p2.is_nan() && p1.distance_squared(p2) > EPSILON {
+                let line_segment = LineSegment2D::from_two_points(p2, p1);
+                right_boundary.push(line_segment);
+            }
+        }
+
+        Self::clean_self_intersections(&mut left_boundary);
+        Self::clean_self_intersections(&mut right_boundary);
+
+        let arc = {
+            let boundary_a = left_boundary.last().unwrap();
+            let boundary_b = right_boundary.last().unwrap();
+
+            let a = boundary_a.end();
+            let b = boundary_b.origin;
+
+            if let Ray2DIntersectionResult::Point(t) =
+                boundary_a.to_ray().intersect(&boundary_b.to_ray())
+            {
+                let r = radius * Self::scale_factor(acc_control_param, time_horizon);
+
+                if r < a.distance(b) / 2.0 {
+                    AVOBoundary::LineSegment(LineSegment2D::from_two_points(a, b))
+                } else {
+                    let (a1, a2) = Arc2D::from_points(r, a, b);
+                    let intersection = boundary_a.origin + boundary_a.direction * t;
+
+                    if a1.center.distance_squared(intersection)
+                        > a2.center.distance_squared(intersection)
+                    {
+                        AVOBoundary::Arc(a1)
+                    } else {
+                        AVOBoundary::Arc(a2)
+                    }
+                }
+            } else {
+                AVOBoundary::LineSegment(LineSegment2D::from_two_points(a, b))
+            }
+        };
+
+        let mut result = Vec::with_capacity(discrete_steps as usize * 2 + 1);
+
+        left_boundary
+            .drain(..)
+            .for_each(|line_segment| result.push(AVOBoundary::LineSegment(line_segment)));
+        right_boundary.reverse();
+
+        result.push(arc);
+
+        right_boundary
+            .drain(..)
+            .for_each(|line_segment| result.push(AVOBoundary::LineSegment(line_segment)));
+
+        result
+    }
+
+    fn clean_self_intersections(boundary: &mut Vec<LineSegment2D>) {
+        for i in 0..boundary.len() {
+            let mut intesecting_line = None;
+            let mut t = None;
+
+            for j in i + 1..boundary.len() {
+                let intersection = boundary[i].intersect(&boundary[j]);
+                if let LineSegment2DIntersectionResult::Point(t1) = intersection {
+                    if (t1 - boundary[i].t_max).abs() < EPSILON
+                        || (t1 - boundary[j].t_min).abs() < EPSILON
+                    {
+                        continue;
+                    }
+
+                    intesecting_line = Some(j);
+                    t = Some(t1);
+                }
+            }
+
+            if let Some(intesecting_line) = intesecting_line {
+                boundary[i].t_max = t.unwrap();
+                boundary.drain(i + 1..intesecting_line);
+            }
+        }
+    }
+
+    fn scale_factor(acc_control_param: f32, t: f32) -> f32 {
+        let param = acc_control_param * ((-t / acc_control_param).exp() - 1.0);
+
+        (t + param).recip()
+    }
+
+    fn boundary(t: f32, delta: f32, r_ab: f32, v_ab: Vec2, p_ab: Vec2, sign: f32) -> Vec2 {
+        // Precalcualte some parameters that are used multiple times
+        let exp = (-t / delta).exp();
+        let param = exp - 1.0;
+        let delta_param = delta * param;
+
+        // Calculate the center value
+        let center = (v_ab * delta_param - p_ab) / (delta_param + t);
+
+        // Calculate the radius value
+        let radius = r_ab / (delta_param + t);
+
+        // Calculate the derivative of the center value
+        let center_dot = ((v_ab * delta_param - p_ab) * param) / (delta_param + t).powi(2)
+            - (v_ab * exp) / (delta_param + t);
+
+        // Calculate the derivative of the radius value
+        let radius_dot = r_ab * param / (delta_param + t).powi(2);
+
+        // Precompute he radius rate of change
+        let rrc = radius / radius_dot * center_dot;
+
+        // Calculat the tangent result
+        let tangent = {
+            let p_len_sq = rrc.length_squared();
+            let r = radius;
+
+            let l = (p_len_sq - r * r).sqrt();
+            let mat = Mat2::from_cols(Vec2::new(l, sign * r), Vec2::new(-sign * r, l));
+
+            mat * rrc * (l / p_len_sq)
+        };
+
+        // Calculate the boundary
+        center - rrc + tangent
+    }
+
+    fn lerp(a: f32, b: f32, t: f32) -> f32 {
+        a + (b - a) * t
+    }
+}
+
+impl Vec2Operations for AVOBoundary {
+    fn contains(&self, pt: Vec2) -> bool {
+        match self {
+            AVOBoundary::LineSegment(line_segment) => line_segment.contains(pt),
+            AVOBoundary::Arc(arc) => arc.contains(pt),
+        }
+    }
+
+    fn constrain(&self, pt: Vec2) -> Vec2 {
+        match self {
+            AVOBoundary::LineSegment(line_segment) => line_segment.constrain(pt),
+            AVOBoundary::Arc(arc) => arc.constrain(pt),
+        }
+    }
+
+    fn closest_point_and_normal(&self, pt: Vec2) -> (Vec2, Vec2) {
+        match self {
+            AVOBoundary::LineSegment(line_segment) => {
+                let (pt, _) = line_segment.closest_point_and_normal(pt);
+
+                // Here we need to switch the normal if its aiming below the border line
+                let perp = line_segment.direction.perp();
+
+                (pt, -perp)
+            }
+            AVOBoundary::Arc(arc) => arc.closest_point_and_normal(pt),
+        }
+    }
+
+    fn signed_distance(&self, pt: Vec2) -> f32 {
+        match self {
+            AVOBoundary::LineSegment(line_segment) => line_segment.signed_distance(pt),
+            AVOBoundary::Arc(arc) => arc.signed_distance(pt),
+        }
+    }
 }
 
 impl AccelerationVelocityObstacle3D {
@@ -27,7 +235,7 @@ impl AccelerationVelocityObstacle3D {
         agent_other: &Agent3D,
         time_horizon: f32,
         acc_control_param: f32,
-        discrete_steps: usize,
+        discrete_steps: u16,
     ) -> Self {
         let shape = agent_self.shape.minkowski_sum(&agent_other.shape);
         let relative_position = agent_self.position - agent_other.position;
@@ -35,125 +243,6 @@ impl AccelerationVelocityObstacle3D {
         let agent_velocity = agent_self.velocity;
         let total_responsibility = agent_self.responsibility + agent_other.responsibility;
         let agent_self_responsibility = agent_self.responsibility / total_responsibility;
-        let bounding_radius = shape.bounding_sphere().radius;
-
-        let (cutoff, cones, cutoff_secant_plane, circles) = {
-            let mut spheres = Vec::with_capacity(discrete_steps);
-
-            for i in 0..discrete_steps {
-                #[allow(clippy::cast_precision_loss)]
-                let t = Self::lerp(time_horizon, 0.001, i as f32 / discrete_steps as f32);
-
-                let center =
-                    Self::avo_center(acc_control_param, relative_velocity, relative_position, t);
-                let scale_factor = Self::scale_factor(acc_control_param, t);
-
-                spheres.push(Sphere::new(bounding_radius * scale_factor, center));
-            }
-
-            let cutoff = {
-                let mut result = &spheres[0];
-
-                for sphere in &spheres {
-                    if let SphereSphereIntersection::Inside = sphere.intersect_sphere(result) {
-                        result = sphere;
-                    } else {
-                        break;
-                    }
-                }
-
-                result.clone()
-            };
-
-            let cutoff_secant_plane = cutoff.get_secant_plane(Vec3::ZERO);
-
-            let mut circles = Vec::with_capacity(discrete_steps);
-
-            {
-                let radius = {
-                    let mut max_radius = 0.0;
-
-                    for sphere in &spheres {
-                        if let Some(intersection) = sphere.intersect_plane(&cutoff_secant_plane) {
-                            if intersection.radius > max_radius {
-                                max_radius = intersection.radius;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-
-                    max_radius
-                };
-
-                circles.push(Circle3d::new(
-                    radius,
-                    cutoff_secant_plane.origin,
-                    cutoff_secant_plane.normal,
-                ));
-            }
-
-            for i in 0..discrete_steps - 1 {
-                let normal = (spheres[i + 1].origin - spheres[i].origin).normalize();
-                let origin = spheres[i].origin;
-                let plane = Plane::new(origin, normal);
-
-                let radius = {
-                    let mut max_radius = spheres[i].radius;
-
-                    for sphere in spheres.iter().skip(i + 1) {
-                        if let Some(intersection) = sphere.intersect_plane(&plane) {
-                            if intersection.radius > max_radius {
-                                max_radius = intersection.radius;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-
-                    max_radius
-                };
-
-                circles.push(Circle3d::new(radius, origin, normal));
-            }
-
-            {
-                let mut i = 0;
-                loop {
-                    if circles[i].radius < EPSILON {
-                        circles.remove(i);
-                    } else if circles[i + 1].radius - circles[i].radius < EPSILON {
-                        circles.remove(i + 1);
-                    } else if (circles[i + 1].origin - circles[i].origin).length_squared() < EPSILON
-                    {
-                        circles.remove(i + 1);
-                    }
-
-                    i += 1;
-                    if i == circles.len() - 2 {
-                        break;
-                    }
-                }
-            }
-
-            let mut cones = Vec::with_capacity(circles.len() - 1);
-            for i in 0..circles.len() - 1 {
-                let mut cone = Cone::new(
-                    circles[i].radius,
-                    circles[i].origin,
-                    circles[i + 1].radius,
-                    circles[i + 1].origin,
-                );
-
-                if i == circles.len() - 2 {
-                    cone.max_height = None;
-                }
-
-                cones.push(cone);
-            }
-
-            (cutoff, cones, cutoff_secant_plane, circles)
-        };
 
         Self {
             relative_position,
@@ -164,20 +253,14 @@ impl AccelerationVelocityObstacle3D {
             responsibility: agent_self_responsibility,
             acc_control_param,
             discrete_steps,
-            cutoff,
-            cutoff_secant_plane,
-            cones,
-            circles,
         }
-    }
-
-    fn lerp(a: f32, b: f32, t: f32) -> f32 {
-        a + (b - a) * t
     }
 
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn orca_plane(&self, time_step: f32) -> Plane {
+    pub fn orca_plane(&self, time_step: f32, gizmos: &mut Gizmos) -> Plane {
+        let radius = self.shape.bounding_sphere().radius;
+
         // Collision
         let (u, normal) = if self.shape.contains(self.relative_position) {
             // project on a cutoff plane at time_step
@@ -200,26 +283,134 @@ impl AccelerationVelocityObstacle3D {
             let u = p + cutoff_center - self.relative_velocity;
 
             (u, normal)
+        } else if self.relative_velocity.length_squared() < EPSILON {
+            let cutoff_sphere = {
+                let cutoff_center = Self::avo_center(
+                    self.acc_control_param,
+                    self.relative_velocity,
+                    self.relative_position,
+                    self.time_horizon,
+                );
+
+                let cutoff_radius =
+                    radius * Self::scale_factor(self.acc_control_param, self.time_horizon);
+
+                Sphere::new(cutoff_radius, cutoff_center)
+            };
+
+            let (p, normal) = cutoff_sphere.closest_point_and_normal(Vec3::ZERO);
+            let u = p - self.relative_velocity;
+
+            (u, normal)
         } else {
-            let (closest, normal) = self.cutoff.closest_point_and_normal(self.relative_velocity);
-            let mut closest = closest;
-            let mut normal = normal;
-            let mut square_distance = (closest - self.relative_velocity).length_squared();
+            let p0 = Vec3::ZERO;
+            let p1 = self.relative_velocity;
+            let p2 = {
+                if self
+                    .relative_position
+                    .normalize_or_zero()
+                    .cross(p1.normalize_or_zero())
+                    .length_squared()
+                    < EPSILON
+                {
+                    let p1_dot_x = p1.dot(Vec3::X);
+                    let p1_dot_y = p1.dot(Vec3::Y);
+                    let p1_dot_z = p1.dot(Vec3::Z);
 
-            for cone in &self.cones {
-                let (p, n) = cone.closest_point_and_normal(self.relative_velocity);
-                let dist_sq = (p - self.relative_velocity).length_squared();
+                    let basis =
+                        if p1_dot_x.abs() < p1_dot_y.abs() && p1_dot_x.abs() < p1_dot_z.abs() {
+                            Vec3::X
+                        } else if p1_dot_y.abs() < p1_dot_z.abs() {
+                            Vec3::Y
+                        } else {
+                            Vec3::Z
+                        };
 
-                if dist_sq < square_distance {
-                    square_distance = dist_sq;
-                    closest = p;
+                    p1.cross(basis).normalize_or_zero()
+                } else {
+                    self.relative_position
+                }
+            };
+
+            let plane = Plane::from_points(p0, p1, p2);
+            let v_ab = plane.project_2d(self.relative_velocity);
+            let p_ab = plane.project_2d(self.relative_position);
+
+            let boundary = AVOBoundary::new(
+                v_ab,
+                p_ab,
+                radius,
+                self.time_horizon,
+                self.acc_control_param,
+                self.discrete_steps,
+            );
+
+            //for boundary in &boundary {
+            //    match boundary {
+            //        AVOBoundary::LineSegment(line_segment) => {
+            //            let from =
+            //                line_segment.origin + line_segment.direction * line_segment.t_min;
+            //            let to = line_segment.origin + line_segment.direction * line_segment.t_max;
+
+            //            let from_3d = plane.project_3d(from);
+            //            let to_3d = plane.project_3d(to);
+
+            //            gizmos.line(from_3d, to_3d, Color::RED);
+            //        }
+            //        AVOBoundary::Arc(arc) => {
+            //            for i in 0..10_u16 {
+            //                let t1 = arc.point_at(f32::from(i) / 10.0);
+            //                let t2 = arc.point_at(f32::from(i + 1) / 10.0);
+
+            //                let t1_3d = plane.project_3d(t1);
+            //                let t2_3d = plane.project_3d(t2);
+
+            //                gizmos.line(t1_3d, t2_3d, Color::RED);
+            //            }
+            //        }
+            //    }
+            //}
+
+            let (mut u, mut normal) = boundary[0].closest_point_and_normal(v_ab);
+            let mut selected_index = 0;
+
+            for (i, boundary) in boundary.iter().enumerate().skip(1) {
+                let (p, n) = boundary.closest_point_and_normal(v_ab);
+
+                if (p - v_ab).length_squared() < (u - v_ab).length_squared() {
+                    u = p;
                     normal = n;
+                    selected_index = i;
                 }
             }
 
-            let u = closest - self.relative_velocity;
+            let u = plane.project_3d(u);
+            let normal = plane.project_3d(normal);
 
-            (u, normal)
+            match &boundary[selected_index] {
+                AVOBoundary::LineSegment(line_segment) => {
+                    let from = line_segment.origin + line_segment.direction * line_segment.t_min;
+                    let to = line_segment.origin + line_segment.direction * line_segment.t_max;
+
+                    let from_3d = plane.project_3d(from);
+                    let to_3d = plane.project_3d(to);
+
+                    gizmos.line(from_3d, to_3d, Color::YELLOW);
+                }
+                AVOBoundary::Arc(arc) => {
+                    for i in 0..10_u16 {
+                        let t1 = arc.point_at(f32::from(i) / 10.0);
+                        let t2 = arc.point_at(f32::from(i + 1) / 10.0);
+
+                        let t1_3d = plane.project_3d(t1);
+                        let t2_3d = plane.project_3d(t2);
+
+                        gizmos.line(t1_3d, t2_3d, Color::YELLOW);
+                    }
+                }
+            }
+
+            (u - self.relative_velocity, normal)
         };
 
         Plane::new(self.agent_velocity + self.responsibility * u, normal)
