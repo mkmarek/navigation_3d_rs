@@ -52,8 +52,8 @@ const MAX_FORCE: f32 = 50.0;
 const AGENT_MASS: f32 = 2.0;
 const MAX_ACCELERATION: f32 = MAX_FORCE / AGENT_MASS;
 const AGENT_RADIUS: f32 = 5.0;
-const SEPARATION_RADIUS: f32 = AGENT_RADIUS * 1.5;
-const ORCA_RADIUS: f32 = SEPARATION_RADIUS * 1.1;
+const SEPARATION_RADIUS: f32 = AGENT_RADIUS * 1.0;
+const ORCA_RADIUS: f32 = SEPARATION_RADIUS * 1.0;
 const NUMBER_OF_NEIGHBORS: usize = 20;
 const OBSTACLE_RADIUS: Range<f32> = 10.0..20.0;
 
@@ -190,7 +190,11 @@ fn draw_gizmos(
             let distance = t.translation.distance(transform.translation);
 
             if distance < AGENT_RADIUS + obstacle.radius {
-                println!("Collision detected!");
+                println!(
+                    "Collision detected! {} < {}",
+                    distance,
+                    AGENT_RADIUS + obstacle.radius
+                );
             }
         }
 
@@ -203,8 +207,9 @@ fn draw_gizmos(
             MAX_FORCE,
             AGENT_MASS,
             10.0,
-            &mut gizmos,
         );
+
+        println!("{:?}", follow_path_result);
 
         let mut desired_velocity = match follow_path_result {
             FollowPathResult::CurrentSegment(velocity) => velocity.clamp_length_max(MAX_SPEED),
@@ -222,8 +227,6 @@ fn draw_gizmos(
                 velocity.clamp_length_max(MAX_SPEED)
             }
         };
-
-        println!("Desired velocity: {:?}", desired_velocity);
 
         let time_horizon = MAX_SPEED / (MAX_FORCE / AGENT_MASS);
         let mut nearest_neighbors = obstacles.iter().collect::<Vec<_>>();
@@ -269,11 +272,7 @@ fn draw_gizmos(
                     2.0 * MAX_SPEED / MAX_ACCELERATION,
                     25,
                 )
-                .orca_plane(
-                    time.delta_seconds(),
-                    &mut gizmos,
-                    transform.translation,
-                )
+                .orca_plane(time.delta_seconds())
             })
             .collect::<Vec<Plane>>();
 
@@ -284,8 +283,11 @@ fn draw_gizmos(
         );
 
         println!("Optimal velocity: {:?}", optimal_velocity);
+        println!("Desired velocity: {:?}", desired_velocity);
 
         desired_velocity = velocity.value + optimal_velocity;
+
+        println!("[updated] Desired velocity: {:?}", desired_velocity);
 
         let (new_velocity, new_rotation) = update_agent_on_path(
             velocity.value,
@@ -324,18 +326,18 @@ fn draw_gizmos(
             Color::RED,
         );
 
-        gizmos.sphere(
-            transform.translation,
-            Quat::IDENTITY,
-            SEPARATION_RADIUS,
-            Color::GREEN,
-        );
+        //gizmos.sphere(
+        //    transform.translation,
+        //    Quat::IDENTITY,
+        //    SEPARATION_RADIUS,
+        //    Color::GREEN,
+        //);
 
-        gizmos.sphere(
-            transform.translation,
-            Quat::IDENTITY,
-            ORCA_RADIUS,
-            Color::BLUE,
-        );
+        //gizmos.sphere(
+        //    transform.translation,
+        //    Quat::IDENTITY,
+        //    ORCA_RADIUS,
+        //    Color::BLUE,
+        //);
     }
 }

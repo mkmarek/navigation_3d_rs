@@ -1,6 +1,4 @@
-use bevy_gizmos::gizmos::Gizmos;
 use bevy_math::Vec3;
-use bevy_render::color::Color;
 use geometry::{Ray3D, SecondTangentPointResult};
 
 use crate::TurnPlane;
@@ -66,6 +64,7 @@ pub fn seek(target: Vec3, agent_position: Vec3, agent_max_force: f32, tolerance:
     displacement.normalize() * agent_max_force
 }
 
+#[derive(Debug)]
 pub enum FollowPathResult {
     CurrentSegment(Vec3),
     NextSegment(Vec3, usize),
@@ -103,7 +102,6 @@ pub fn follow_path(
     agent_max_force: f32,
     agent_mass: f32,
     position_tolerance: f32,
-    gizmos: &mut Gizmos,
 ) -> FollowPathResult {
     let segment = path[path_index + 1] - path[path_index];
     let segment_length = segment.length();
@@ -114,8 +112,20 @@ pub fn follow_path(
 
     if path_index == path.len() - 2 {
         if agent_position.distance(path[path_index + 1]) < position_tolerance {
+            println!("[1] end of path {}", Vec3::ZERO);
             return FollowPathResult::EndOfPath(Vec3::ZERO);
         }
+
+        println!(
+            "[2] arrive {}",
+            arrive(
+                path[path_index + 1],
+                agent_position,
+                agent_mass,
+                agent_max_force,
+                position_tolerance,
+            )
+        );
         return FollowPathResult::CurrentSegment(arrive(
             path[path_index + 1],
             agent_position,
@@ -128,14 +138,7 @@ pub fn follow_path(
     // We'll create a turn plane and try to determine if the agent can
     // make the turn
     let turn_plane = TurnPlane::new(agent_position, path[path_index + 1], path[path_index + 2]);
-
     let turn_circle = turn_plane.turn_circle(agent_velocity.length(), agent_max_turning_speed);
-    gizmos.circle(
-        turn_plane.project_3d(turn_circle.origin),
-        turn_plane.normal,
-        turn_circle.radius,
-        Color::RED,
-    );
 
     if parameter < segment_length / 2.0 {
         let lookahead_point = ray.at(parameter + agent_max_force);
@@ -147,30 +150,15 @@ pub fn follow_path(
             position_tolerance,
         );
 
+        println!("[3] current segment {}", seek_force);
         return FollowPathResult::CurrentSegment(seek_force);
     }
 
     let tangent_result = turn_plane.find_tangent_between_agent_and_turn_point(&turn_circle);
-    let direction = (path[path_index + 1] - agent_position).normalize();
-    let new_direction = path[path_index + 2] - path[path_index + 1];
-
-    match tangent_result {
-        geometry::SecondTangentPointResult::None => {}
-        geometry::SecondTangentPointResult::Point(t) => {
-            let tangent = agent_position + direction * t;
-            gizmos.line(tangent, tangent + new_direction, Color::GREEN);
-        }
-        geometry::SecondTangentPointResult::TwoPoints(t1, t2) => {
-            let tangent1 = agent_position + direction * t1;
-            let tangent2 = agent_position + direction * t2;
-
-            gizmos.line(tangent1, tangent1 + new_direction, Color::GREEN);
-            gizmos.line(tangent2, tangent2 + new_direction, Color::TURQUOISE);
-        }
-    }
 
     if let SecondTangentPointResult::None = tangent_result {
         if agent_position.distance(path[path_index + 1]) < position_tolerance {
+            println!("[4] end of path {}", Vec3::ZERO);
             return FollowPathResult::NextSegment(Vec3::ZERO, path_index + 1);
         }
 
@@ -182,6 +170,7 @@ pub fn follow_path(
             position_tolerance,
         );
 
+        println!("[5] arrive {}", arrive_force);
         return FollowPathResult::CurrentSegment(arrive_force);
     }
 
@@ -202,8 +191,19 @@ pub fn follow_path(
         loop {
             if lookahead_index == path.len() - 2 {
                 if agent_position.distance(path[lookahead_index + 1]) < position_tolerance {
+                    println!("[6] end of path {}", Vec3::ZERO);
                     return FollowPathResult::EndOfPath(Vec3::ZERO);
                 }
+                println!(
+                    "[7] arrive {}",
+                    arrive(
+                        path[lookahead_index + 1],
+                        agent_position,
+                        agent_mass,
+                        agent_max_force,
+                        position_tolerance,
+                    )
+                );
                 return FollowPathResult::CurrentSegment(arrive(
                     path[lookahead_index + 1],
                     agent_position,
@@ -223,8 +223,16 @@ pub fn follow_path(
         }
     };
 
-    let segment_direction = (path[lookahead_index + 1] - path[lookahead_index]).normalize();
-    let lookahead_point = path[lookahead_index] + segment_direction * lookahead_parameter;
+    let lookahead_point = {
+        let segment_direction = (path[lookahead_index + 1] - path[lookahead_index]).normalize();
+        let pt = path[lookahead_index] + segment_direction * (lookahead_parameter);
+
+        if pt.distance_squared(agent_position) <= position_tolerance * position_tolerance {
+            path[lookahead_index + 1]
+        } else {
+            pt
+        }
+    };
 
     let seek_force = seek(
         lookahead_point,
@@ -234,8 +242,10 @@ pub fn follow_path(
     );
 
     if lookahead_index == path_index {
+        println!("[8] current segment {}", seek_force);
         FollowPathResult::CurrentSegment(seek_force)
     } else {
+        println!("[9] next segment {}", seek_force);
         FollowPathResult::NextSegment(seek_force, lookahead_index)
     }
 }

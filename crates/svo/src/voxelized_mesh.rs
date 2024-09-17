@@ -15,7 +15,7 @@ impl VoxelizedMesh {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::{VoxelizedMesh};
+    /// use svo::{VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3};
     ///
     /// let voxels = vec![
@@ -47,7 +47,7 @@ impl VoxelizedMesh {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::{VoxelizedMesh};
+    /// use svo::{VoxelizedMesh};
     /// use bevy_math::IVec3;
     ///
     /// let voxelized_mesh = VoxelizedMesh::sphere(1.0, 1.0, IVec3::new(0, 0, 0));
@@ -94,7 +94,7 @@ impl VoxelizedMesh {
     /// ```
     /// use bevy::prelude::*;
     /// use bevy_render::prelude::shape::UVSphere;
-    /// use svo_rs::{VoxelizedMesh};
+    /// use svo::{VoxelizedMesh};
     ///
     /// let sphere = Mesh::from(UVSphere::default());
     /// let mesh = VoxelizedMesh::from_mesh(&sphere, Transform::IDENTITY.compute_matrix(), 1.0)

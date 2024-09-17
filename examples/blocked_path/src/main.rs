@@ -166,7 +166,6 @@ fn draw_gizmos(
             MAX_FORCE,
             AGENT_MASS,
             10.0,
-            &mut gizmos,
         );
 
         let mut desired_velocity = match follow_path_result {
@@ -230,11 +229,7 @@ fn draw_gizmos(
                     2.0 * MAX_SPEED / MAX_ACCELERATION,
                     25,
                 )
-                .orca_plane(
-                    time.delta_seconds(),
-                    &mut gizmos,
-                    transform.translation,
-                )
+                .orca_plane(time.delta_seconds())
             })
             .collect::<Vec<Plane>>();
 

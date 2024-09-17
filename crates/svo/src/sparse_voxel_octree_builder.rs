@@ -19,7 +19,7 @@ use crate::{
 /// # Example
 ///
 /// ```
-/// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+/// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
 /// use bevy_math::{IVec3, UVec3};
 ///
 /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);
@@ -43,7 +43,7 @@ impl SparseVoxelOctreeBuilder {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::SparseVoxelOctreeBuilder;
+    /// use svo::SparseVoxelOctreeBuilder;
     ///
     /// let builder = SparseVoxelOctreeBuilder::new(1.0);
     /// ```
@@ -62,7 +62,7 @@ impl SparseVoxelOctreeBuilder {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+    /// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3};
     ///
     /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);
@@ -82,7 +82,7 @@ impl SparseVoxelOctreeBuilder {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+    /// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3, Vec3};
     ///
     /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);
@@ -100,7 +100,7 @@ impl SparseVoxelOctreeBuilder {
     /// # Example
     ///
     /// ```
-    /// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+    /// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3};
     ///
     /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);

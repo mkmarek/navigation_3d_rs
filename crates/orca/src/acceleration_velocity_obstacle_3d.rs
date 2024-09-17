@@ -1,5 +1,5 @@
 use bevy_gizmos::gizmos::Gizmos;
-use bevy_math::{Mat2, Quat, Vec2, Vec3};
+use bevy_math::{Mat2, Vec2, Vec3};
 use bevy_render::color::Color;
 use geometry::{
     colliders::Collider, Arc2D, Cone, LineSegment2D, LineSegment2DIntersection,
@@ -258,24 +258,24 @@ impl AccelerationVelocityObstacle3D {
 
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn orca_plane(&self, time_step: f32, gizmos: &mut Gizmos, offset: Vec3) -> Plane {
+    pub fn orca_plane(&self, time_step: f32) -> Plane {
         let radius = self.shape.bounding_sphere().radius;
         let shape_sphere = Sphere::new(radius, Vec3::ZERO);
 
-        let cutoff_ct = Self::avo_center(
-            self.acc_control_param,
-            self.relative_velocity,
-            self.relative_position,
-            self.time_horizon,
-        );
+        //let cutoff_ct = Self::avo_center(
+        //    self.acc_control_param,
+        //    self.relative_velocity,
+        //    self.relative_position,
+        //    self.time_horizon,
+        //);
 
-        let cutoff_radius = radius * Self::scale_factor(self.acc_control_param, self.time_horizon);
-        gizmos.sphere(
-            cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
-            Quat::IDENTITY,
-            cutoff_radius,
-            Color::GREEN,
-        );
+        //let cutoff_radius = radius * Self::scale_factor(self.acc_control_param, self.time_horizon);
+        //gizmos.sphere(
+        //    cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+        //    Quat::IDENTITY,
+        //    cutoff_radius,
+        //    Color::GREEN,
+        //);
         // Collision
         let (u, normal) = if shape_sphere.contains(self.relative_position) {
             // project on a cutoff plane at time_step
@@ -301,27 +301,27 @@ impl AccelerationVelocityObstacle3D {
             let direction_from_relative_velocity_to_cutoff =
                 (cutoff_ct - self.relative_velocity).normalize_or_zero();
 
-            gizmos.sphere(
-                cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
-                Quat::IDENTITY,
-                cutoff_radius,
-                Color::GREEN,
-            );
+            //gizmos.sphere(
+            //    cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+            //    Quat::IDENTITY,
+            //    cutoff_radius,
+            //    Color::GREEN,
+            //);
 
-            gizmos.sphere(
-                time_step_ct - self.relative_velocity + offset + self.agent_velocity,
-                Quat::IDENTITY,
-                time_step_radius,
-                Color::WHITE,
-            );
+            //gizmos.sphere(
+            //    time_step_ct - self.relative_velocity + offset + self.agent_velocity,
+            //    Quat::IDENTITY,
+            //    time_step_radius,
+            //    Color::WHITE,
+            //);
 
-            draw_truncated_cone(
-                gizmos,
-                cutoff_radius,
-                cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
-                time_step_radius,
-                time_step_ct - self.relative_velocity + offset + self.agent_velocity,
-            );
+            //draw_truncated_cone(
+            //    gizmos,
+            //    cutoff_radius,
+            //    cutoff_ct - self.relative_velocity + offset + self.agent_velocity,
+            //    time_step_radius,
+            //    time_step_ct - self.relative_velocity + offset + self.agent_velocity,
+            //);
 
             let dt_sphere = Sphere::new(time_step_radius, time_step_ct);
             let cutoff_sphere = Sphere::new(cutoff_radius, cutoff_ct);
@@ -405,31 +405,31 @@ impl AccelerationVelocityObstacle3D {
                 self.discrete_steps,
             );
 
-            for boundary in &boundary {
-                match boundary {
-                    AVOBoundary::LineSegment(line_segment) => {
-                        let from =
-                            line_segment.origin + line_segment.direction * line_segment.t_min;
-                        let to = line_segment.origin + line_segment.direction * line_segment.t_max;
+            //for boundary in &boundary {
+            //    match boundary {
+            //        AVOBoundary::LineSegment(line_segment) => {
+            //            let from =
+            //                line_segment.origin + line_segment.direction * line_segment.t_min;
+            //            let to = line_segment.origin + line_segment.direction * line_segment.t_max;
 
-                        let from_3d = plane.project_3d(from);
-                        let to_3d = plane.project_3d(to);
+            //            let from_3d = plane.project_3d(from);
+            //            let to_3d = plane.project_3d(to);
 
-                        gizmos.line(from_3d, to_3d, Color::RED);
-                    }
-                    AVOBoundary::Arc(arc) => {
-                        for i in 0..10_u16 {
-                            let t1 = arc.point_at(f32::from(i) / 10.0);
-                            let t2 = arc.point_at(f32::from(i + 1) / 10.0);
+            //            gizmos.line(from_3d, to_3d, Color::RED);
+            //        }
+            //        AVOBoundary::Arc(arc) => {
+            //            for i in 0..10_u16 {
+            //                let t1 = arc.point_at(f32::from(i) / 10.0);
+            //                let t2 = arc.point_at(f32::from(i + 1) / 10.0);
 
-                            let t1_3d = plane.project_3d(t1);
-                            let t2_3d = plane.project_3d(t2);
+            //                let t1_3d = plane.project_3d(t1);
+            //                let t2_3d = plane.project_3d(t2);
 
-                            gizmos.line(t1_3d, t2_3d, Color::RED);
-                        }
-                    }
-                }
-            }
+            //                gizmos.line(t1_3d, t2_3d, Color::RED);
+            //            }
+            //        }
+            //    }
+            //}
 
             let (mut u, mut normal) = boundary[0].closest_point_and_normal(v_ab);
 
@@ -477,7 +477,7 @@ fn draw_truncated_cone(
     back_radius: f32,
     back_position: Vec3,
 ) {
-    const SEGMENTS: usize = 32;
+    const SEGMENTS: u16 = 32;
 
     let direction = (back_position - front_position).normalize();
 
@@ -511,7 +511,7 @@ fn draw_truncated_cone(
 
     // Draw sides
     for i in 0..SEGMENTS {
-        let angle = i as f32 / SEGMENTS as f32 * std::f32::consts::TAU;
+        let angle = f32::from(i) / f32::from(SEGMENTS) * std::f32::consts::TAU;
         let perp_1 = direction.cross(basis_angle).normalize();
         let perp_2 = direction.cross(perp_1).normalize();
 

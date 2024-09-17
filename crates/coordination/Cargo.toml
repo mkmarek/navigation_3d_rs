@@ -4,7 +4,13 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
+geometry = { path = "../geometry" }
+
 bevy_math = { workspace = true }
 bevy_gizmos = { workspace = true }
 bevy_render = { workspace = true }
+
+rand = "0.8.5"
+approx = "0.3.2"
+
 

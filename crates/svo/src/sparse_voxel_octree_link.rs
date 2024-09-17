@@ -9,7 +9,7 @@ use crate::{
 /// # Examples
 ///
 /// ```
-/// use svo_rs::{SparseVoxelOctreeLink, SparseVoxelOctreeBuilder, VoxelizedMesh};
+/// use svo::{SparseVoxelOctreeLink, SparseVoxelOctreeBuilder, VoxelizedMesh};
 /// use bevy_math::{IVec3, UVec3, Vec3};
 ///
 /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);
@@ -43,7 +43,7 @@ impl SparseVoxelOctreeLink {
     /// # Examples
     ///
     /// ```
-    /// use svo_rs::SparseVoxelOctreeLink;
+    /// use svo::SparseVoxelOctreeLink;
     ///
     /// let link = SparseVoxelOctreeLink::new(0, 0, None);
     /// ```
@@ -66,7 +66,7 @@ impl SparseVoxelOctreeLink {
     /// # Examples
     ///
     /// ```
-    /// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+    /// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3, Vec3};
     ///
     /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);
@@ -116,7 +116,7 @@ impl SparseVoxelOctreeLink {
     /// # Examples
     ///
     /// ```
-    /// use svo_rs::{SparseVoxelOctreeBuilder, VoxelizedMesh};
+    /// use svo::{SparseVoxelOctreeBuilder, VoxelizedMesh};
     /// use bevy_math::{IVec3, UVec3, Vec3};
     ///
     /// let mut builder = SparseVoxelOctreeBuilder::new(1.0);

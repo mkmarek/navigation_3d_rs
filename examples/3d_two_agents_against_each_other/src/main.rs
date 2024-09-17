@@ -2,7 +2,7 @@ use bevy::{prelude::*, render::mesh::shape::UVSphere};
 use bevy_egui::EguiPlugin;
 use example_utils::{CameraTarget, UniversalCamera, UniversalCameraPlugin, UtilsPlugin};
 use geometry::{colliders::Collider, Plane};
-use orca::{optimize_velocity_3d, Agent3D, VelocityObstacle3D};
+use orca::{optimize_velocity_3d, AccelerationVelocityObstacle3D, Agent3D};
 
 fn main() {
     App::new()
@@ -53,6 +53,10 @@ fn spawn_agent(
 }
 
 const AGENT_SPEED: f32 = 100.0;
+const MAX_FORCE: f32 = 100.0;
+const AGENT_MASS: f32 = 2.0;
+const MAX_ACCELERATION: f32 = MAX_FORCE / AGENT_MASS;
+
 fn setup(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -124,7 +128,11 @@ fn separation_velocity(
     separation_velocity
 }
 
-fn update_agents(time: Res<Time>, mut agents: Query<(Entity, &mut Agent, &mut Transform)>) {
+fn update_agents(
+    time: Res<Time>,
+    mut agents: Query<(Entity, &mut Agent, &mut Transform)>,
+    //mut gizmos: Gizmos,
+) {
     const TIME_HORIZON: f32 = 6.0;
     const TIME_STEP: f32 = 0.1;
 
@@ -150,7 +158,7 @@ fn update_agents(time: Res<Time>, mut agents: Query<(Entity, &mut Agent, &mut Tr
         if time.elapsed_seconds() - last_updated > TIME_STEP {
             agent.last_updated = Some(time.elapsed_seconds());
 
-            const NUMBER_OF_NEIGHBORS: usize = 6;
+            const NUMBER_OF_NEIGHBORS: usize = 100;
             // Get number of nearest neighbors
             let mut nearest_neighbors = other_agents
                 .iter()
@@ -177,22 +185,24 @@ fn update_agents(time: Res<Time>, mut agents: Query<(Entity, &mut Agent, &mut Tr
                 //.map(|a| create_orca_plane(&self_agent, a, TIME_HORIZON, TIME_STEP))
                 //    .collect::<Vec<Plane>>();
                 .map(|a| {
-                    VelocityObstacle3D::new(&self_agent, a, TIME_HORIZON)
-                        .orca_plane(time.delta_seconds().max(TIME_STEP))
+                    AccelerationVelocityObstacle3D::new(
+                        &self_agent,
+                        a,
+                        TIME_HORIZON,
+                        2.0 * AGENT_SPEED / MAX_ACCELERATION,
+                        25,
+                    )
+                    .orca_plane(time.delta_seconds().max(TIME_STEP))
                 })
                 .collect::<Vec<Plane>>();
 
-            let mut optimal_velocity =
-                optimize_velocity_3d(agent.desired_velocity, AGENT_SPEED, orca_planes.as_slice());
+            let optimal_velocity = optimize_velocity_3d(
+                agent.desired_velocity - agent.velocity,
+                MAX_ACCELERATION * 2.0 * AGENT_SPEED / MAX_ACCELERATION,
+                orca_planes.as_slice(),
+            );
 
-            if optimal_velocity.length() < agent.desired_velocity.length() * 0.2 {
-                let desired_velocity = agent.desired_velocity.cross(Vec3::Y);
-
-                optimal_velocity =
-                    optimize_velocity_3d(desired_velocity, AGENT_SPEED, orca_planes.as_slice());
-            }
-
-            agent.velocity = agent.velocity.lerp(optimal_velocity, 0.3);
+            agent.velocity += optimal_velocity * MAX_ACCELERATION * time.delta_seconds();
         }
 
         let separation_velocity =
