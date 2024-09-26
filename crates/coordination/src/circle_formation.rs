@@ -1,6 +1,14 @@
 use crate::Formation;
 
-pub struct CircleFormation {}
+pub struct CircleFormation {
+    radius: f32,
+}
+
+impl CircleFormation {
+    pub fn new(radius: f32) -> Self {
+        Self { radius }
+    }
+}
 
 impl Formation for CircleFormation {
     fn get_positions(&self, n_agents: usize) -> Vec<bevy_math::Vec3> {

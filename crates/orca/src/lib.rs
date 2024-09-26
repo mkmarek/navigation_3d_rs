@@ -4,6 +4,7 @@ pub(crate) const EPSILON: f32 = 0.0001;
 
 mod acceleration_velocity_obstacle_3d;
 mod agent_3d;
+mod formation_velocity_obstacle_3d;
 mod solver_2d;
 mod solver_3d;
 mod solver_4d;
@@ -11,6 +12,7 @@ mod velocity_obstacle_3d;
 
 pub use acceleration_velocity_obstacle_3d::*;
 pub use agent_3d::*;
+pub use formation_velocity_obstacle_3d::*;
 pub use velocity_obstacle_3d::*;
 
 use bevy_math::{Vec3, Vec4};

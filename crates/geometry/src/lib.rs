@@ -1,5 +1,6 @@
 pub(crate) const EPSILON: f32 = 0.0001;
 
+mod aabb;
 mod arc;
 mod circle;
 mod circle_3d;
@@ -20,6 +21,7 @@ mod spherinder_hyperplane_plane_intersecion;
 
 pub mod colliders;
 
+pub use aabb::*;
 pub use arc::*;
 pub use circle::*;
 pub use circle_3d::*;
