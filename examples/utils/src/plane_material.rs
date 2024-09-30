@@ -32,7 +32,7 @@ impl Material for PlaneMaterial {
         _layout: &bevy::render::mesh::MeshVertexBufferLayout,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {
-        descriptor.primitive.cull_mode = None;
+        //descriptor.primitive.cull_mode = None;
 
         Ok(())
     }

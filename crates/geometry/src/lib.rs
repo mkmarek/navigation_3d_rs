@@ -18,6 +18,7 @@ mod sphere;
 mod spherinder;
 mod spherinder_hyperplane_intersecion;
 mod spherinder_hyperplane_plane_intersecion;
+mod triangle;
 
 pub mod colliders;
 
@@ -39,3 +40,4 @@ pub use sphere::*;
 pub use spherinder::*;
 pub use spherinder_hyperplane_intersecion::*;
 pub use spherinder_hyperplane_plane_intersecion::*;
+pub use triangle::*;

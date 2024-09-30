@@ -1,8 +1,8 @@
-use std::f32::consts::PI;
+use std::{collections::HashMap, f32::consts::PI};
 
 use bevy_math::{EulerRot, Mat4, Vec3};
 use bevy_render::color::Color;
-use geometry::{colliders::Collider, Aabb, Plane};
+use geometry::{colliders::Collider, Aabb, Plane, Triangle};
 
 use crate::{Agent3D, EPSILON};
 
@@ -48,6 +48,146 @@ impl FormationVelocityObstacle3D {
         roll: f32,
         gizmos: &mut bevy_gizmos::gizmos::Gizmos,
     ) -> Plane {
+        let triangles =
+            self.construct_vo_mesh(number_of_yaw_samples, number_of_pitch_samples, roll);
+
+        Plane::new(Vec3::ZERO, Vec3::ZERO)
+    }
+
+    #[must_use]
+    #[allow(clippy::too_many_lines)]
+    pub fn construct_vo_mesh(
+        &self,
+        number_of_yaw_samples: u16,
+        number_of_pitch_samples: u16,
+        roll: f32,
+    ) -> Vec<Triangle> {
+        let points = self.sample_points(number_of_yaw_samples, number_of_pitch_samples, roll);
+
+        let mut triangles = Vec::new();
+        let mut points_to_process = points.keys().collect::<Vec<_>>();
+
+        while let Some((yaw_step, pitch_step)) = points_to_process.pop() {
+            let (start, end) = points[&(*yaw_step, *pitch_step)];
+
+            let top_neighbor =
+                points.get(&(*yaw_step, (pitch_step + 1) % (number_of_pitch_samples + 1)));
+            let right_neighbor =
+                points.get(&((yaw_step + 1) % (number_of_yaw_samples + 1), *pitch_step));
+            let top_right_neighbor = points.get(&(
+                (yaw_step + 1) % (number_of_yaw_samples + 1),
+                (pitch_step + 1) % (number_of_pitch_samples + 1),
+            ));
+
+            match (top_neighbor, right_neighbor, top_right_neighbor) {
+                (None, None, None) => {}
+                (None, None, Some(_top_right)) => {}
+                (None, Some(right), None) => {
+                    let (right_start, right_end) = right;
+
+                    triangles.push(Triangle::new([start, *right_start, end]));
+                    triangles.push(Triangle::new([*right_start, *right_end, end]));
+                }
+                (None, Some(right), Some(top_right)) => {
+                    let (right_start, right_end) = right;
+                    let (top_right_start, top_right_end) = top_right;
+
+                    triangles.push(Triangle::new([start, *right_start, *top_right_start]));
+                    triangles.push(Triangle::new([end, *right_end, *top_right_end]));
+                    triangles.push(Triangle::new([start, *top_right_start, end]));
+                    triangles.push(Triangle::new([*top_right_start, *top_right_end, end]));
+                }
+                (Some(top), None, None) => {
+                    let (top_start, top_end) = top;
+
+                    triangles.push(Triangle::new([start, end, *top_start]));
+                    triangles.push(Triangle::new([*top_start, end, *top_end]));
+                }
+                (Some(top), None, Some(top_right)) => {
+                    let (top_start, top_end) = top;
+                    let (top_right_start, top_right_end) = top_right;
+
+                    triangles.push(Triangle::new([start, *top_right_start, *top_start]));
+                    triangles.push(Triangle::new([end, *top_end, *top_right_end]));
+                    triangles.push(Triangle::new([start, end, *top_right_start]));
+                    triangles.push(Triangle::new([*top_right_start, end, *top_right_end]));
+                }
+                (Some(top), Some(right), None) => {
+                    let (top_start, top_end) = top;
+                    let (right_start, right_end) = right;
+
+                    triangles.push(Triangle::new([start, *right_start, *top_start]));
+                    triangles.push(Triangle::new([end, *top_end, *right_end]));
+                    triangles.push(Triangle::new([*top_start, *right_start, *right_end]));
+                    triangles.push(Triangle::new([*top_start, *right_end, *top_end]));
+                }
+                (Some(top), Some(right), Some(top_right)) => {
+                    let (top_start, top_end) = top;
+                    let (right_start, right_end) = right;
+                    let (top_right_start, top_right_end) = top_right;
+
+                    triangles.push(Triangle::new([start, *right_start, *top_start]));
+                    triangles.push(Triangle::new([end, *top_end, *right_end]));
+                    triangles.push(Triangle::new([*top_start, *right_start, *top_right_start]));
+                    triangles.push(Triangle::new([*top_end, *top_right_end, *right_end]));
+                }
+            }
+
+            // a case where on the left side there are no points so that side won't be evaluated
+            // and we'll have some missing triangles
+            let left_neighbor = points.get(&(
+                (yaw_step + number_of_yaw_samples - 1) % number_of_yaw_samples,
+                *pitch_step,
+            ));
+            let left_top_neighbor = points.get(&(
+                (yaw_step + number_of_yaw_samples - 1) % number_of_yaw_samples,
+                (pitch_step + 1) % number_of_pitch_samples,
+            ));
+
+            if left_neighbor.is_none() && left_top_neighbor.is_none() {
+                if let Some((top_start, top_end)) = top_neighbor {
+                    triangles.push(Triangle::new([start, *top_start, end]));
+                    triangles.push(Triangle::new([*top_start, *top_end, end]));
+                }
+            }
+            if left_neighbor.is_none() {
+                if let (Some((top_start, top_end)), Some((left_top_start, left_top_end))) =
+                    (top_neighbor, left_top_neighbor)
+                {
+                    triangles.push(Triangle::new([start, *top_start, *left_top_start]));
+                    triangles.push(Triangle::new([end, *left_top_end, *top_end]));
+                    triangles.push(Triangle::new([start, *left_top_start, end]));
+                    triangles.push(Triangle::new([*left_top_start, *left_top_end, end]));
+                }
+            }
+
+            let bottom_neighbor = points.contains_key(&(
+                *yaw_step,
+                (pitch_step + number_of_pitch_samples - 1) % number_of_pitch_samples,
+            ));
+            let bottom_right_neighbor = points.contains_key(&(
+                (yaw_step + 1) % number_of_yaw_samples,
+                (pitch_step + number_of_pitch_samples - 1) % number_of_pitch_samples,
+            ));
+
+            if !bottom_neighbor && !bottom_right_neighbor {
+                if let Some((right_start, right_end)) = right_neighbor {
+                    triangles.push(Triangle::new([start, end, *right_start]));
+                    triangles.push(Triangle::new([*right_start, end, *right_end]));
+                }
+            }
+        }
+
+        triangles
+    }
+
+    #[allow(clippy::too_many_lines)]
+    fn sample_points(
+        &self,
+        number_of_yaw_samples: u16,
+        number_of_pitch_samples: u16,
+        roll: f32,
+    ) -> HashMap<(u16, u16), (Vec3, Vec3)> {
         let collider_shape = {
             let collider = self
                 .obstacle_collider
@@ -58,6 +198,8 @@ impl FormationVelocityObstacle3D {
                 Collider::Aabb(aabb) => aabb,
             }
         };
+
+        let mut points = HashMap::new();
 
         for yaw_step in 0..=number_of_yaw_samples {
             let yaw = Self::lerp(
@@ -208,16 +350,13 @@ impl FormationVelocityObstacle3D {
                 }
 
                 let t_end = t_end.clamp(0.0, 10000.0);
+                let t_start = t_start.clamp(0.0, t_end);
 
-                gizmos.line(
-                    self.formation_position + t_start * front,
-                    self.formation_position + t_end * front,
-                    Color::GREEN,
-                );
+                points.insert((yaw_step, pitch_step), (t_start * front, t_end * front));
             }
         }
 
-        Plane::new(Vec3::ZERO, Vec3::ZERO)
+        points
     }
 
     fn lerp(a: f32, b: f32, t: f32) -> f32 {

@@ -1,8 +1,10 @@
 use std::ops::RangeInclusive;
 
-use bevy::prelude::*;
+use bevy::{prelude::*, render::mesh::Indices};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
-use example_utils::{CameraTarget, UniversalCamera, UniversalCameraPlugin, UtilsPlugin};
+use example_utils::{
+    CameraTarget, PlaneMaterial, UniversalCamera, UniversalCameraPlugin, UtilsPlugin,
+};
 use geometry::{colliders::Collider, Sphere};
 use orca::{Agent3D, FormationVelocityObstacle3D};
 
@@ -18,6 +20,7 @@ struct AgentInformation {
     radius_b: f32,
     lookeahead: f32,
     agent_rotation: Quat,
+    fvo_resolution: u16,
 }
 
 fn main() {
@@ -42,14 +45,21 @@ fn main() {
             radius_b: 50.0,
             lookeahead: 5.0,
             agent_rotation: Quat::IDENTITY,
+            fvo_resolution: 100,
         })
         .add_systems(Startup, setup)
         .add_systems(Update, (draw_agent_gizmos, draw_ui, draw_velocity_obstacle))
         .run();
 }
 
-fn setup(mut commands: Commands) {
-    // camera
+#[derive(Component)]
+struct CollisionMesh;
+
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<PlaneMaterial>>,
+) {
     commands.spawn((
         Camera3dBundle {
             ..Default::default()
@@ -62,6 +72,17 @@ fn setup(mut commands: Commands) {
             locked_cursor_position: None,
         },
     ));
+
+    let collision_mesh = Mesh::from(shape::Cube { size: 1.0 });
+
+    commands
+        .spawn(MaterialMeshBundle {
+            mesh: meshes.add(collision_mesh),
+            material: materials.add(PlaneMaterial::new(Color::WHITE, 10.0)),
+            transform: Transform::from_xyz(0.2, -0.1, -0.25),
+            ..default()
+        })
+        .insert(CollisionMesh);
 }
 
 fn draw_agent_gizmos(mut gizmos: Gizmos, agent_information: Res<AgentInformation>) {
@@ -144,7 +165,7 @@ fn draw_ui(mut contexts: EguiContexts, mut info: ResMut<AgentInformation>) {
         ui.add(
             egui::Slider::new(
                 &mut euler_angles.1,
-                -std::f32::consts::PI..=std::f32::consts::PI,
+                -std::f32::consts::PI / 2.0..=std::f32::consts::PI / 2.0,
             )
             .text("Pitch"),
         );
@@ -162,10 +183,17 @@ fn draw_ui(mut contexts: EguiContexts, mut info: ResMut<AgentInformation>) {
             euler_angles.1,
             euler_angles.2,
         );
+
+        ui.add(egui::Slider::new(&mut info.fvo_resolution, 10..=1000).text("FVO Resolution"));
     });
 }
 
-fn draw_velocity_obstacle(agent_information: Res<AgentInformation>, mut gizmos: Gizmos) {
+fn draw_velocity_obstacle(
+    agent_information: Res<AgentInformation>,
+    mut gizmos: Gizmos,
+    query: Query<(&CollisionMesh, &Handle<Mesh>)>,
+    mut meshes: ResMut<Assets<Mesh>>,
+) {
     let mut agent_self = Agent3D::new(
         agent_information.position_a,
         agent_information.velocity_a,
@@ -183,28 +211,81 @@ fn draw_velocity_obstacle(agent_information: Res<AgentInformation>, mut gizmos: 
     let fvo =
         FormationVelocityObstacle3D::new(&agent_self, &agent_other, agent_information.lookeahead);
 
-    let orca = fvo.orca_plane(0.1, 100, 100, 0.0, &mut gizmos);
-
-    gizmos.sphere(
-        orca.origin + agent_information.position_a,
-        Quat::IDENTITY,
-        1.0,
-        Color::BLUE,
+    let triangles = fvo.construct_vo_mesh(
+        agent_information.fvo_resolution,
+        agent_information.fvo_resolution,
+        0.0,
     );
 
-    gizmos.line(
-        orca.origin + agent_information.position_a,
-        orca.origin + agent_information.position_a + orca.normal * 100.0,
-        Color::BLUE,
+    for triangle in &triangles {
+        gizmos.line(triangle[0], triangle[1], Color::GREEN);
+        gizmos.line(triangle[1], triangle[2], Color::GREEN);
+        gizmos.line(triangle[2], triangle[0], Color::GREEN);
+    }
+
+    let collision_mesh = meshes.get_mut(query.single().1).unwrap();
+
+    collision_mesh.remove_attribute(Mesh::ATTRIBUTE_POSITION);
+    collision_mesh.insert_attribute(
+        Mesh::ATTRIBUTE_POSITION,
+        triangles
+            .iter()
+            .flat_map(|triangle| triangle.points().iter().copied())
+            .collect::<Vec<_>>(),
     );
 
-    let transfrom =
-        Transform::from_translation(agent_information.position_a).looking_to(orca.normal, Vec3::Y);
+    collision_mesh.set_indices(Some(Indices::U32(
+        triangles
+            .iter()
+            .enumerate()
+            .flat_map(|(i, _)| vec![i as u32 * 3, i as u32 * 3 + 1, i as u32 * 3 + 2])
+            .collect(),
+    )));
 
-    gizmos.rect(
-        orca.origin + agent_information.position_a,
-        transfrom.rotation,
-        Vec2::ONE * 100.0,
-        Color::BLUE,
+    collision_mesh.insert_attribute(
+        Mesh::ATTRIBUTE_NORMAL,
+        triangles
+            .iter()
+            .flat_map(|triangle| std::iter::repeat(triangle.normal()).take(3))
+            .collect::<Vec<_>>(),
     );
+
+    collision_mesh.insert_attribute(
+        Mesh::ATTRIBUTE_UV_0,
+        triangles
+            .iter()
+            .flat_map(|triangle| triangle.uv().into_iter())
+            .collect::<Vec<_>>(),
+    );
+
+    //let orca = fvo.orca_plane(
+    //    0.1,
+    //    agent_information.fvo_resolution,
+    //    agent_information.fvo_resolution,
+    //    0.0,
+    //    &mut gizmos,
+    //);
+
+    //    gizmos.sphere(
+    //        orca.origin + agent_information.position_a,
+    //        Quat::IDENTITY,
+    //        1.0,
+    //        Color::BLUE,
+    //    );
+    //
+    //    gizmos.line(
+    //        orca.origin + agent_information.position_a,
+    //        orca.origin + agent_information.position_a + orca.normal * 100.0,
+    //        Color::BLUE,
+    //    );
+    //
+    //    let transfrom =
+    //        Transform::from_translation(agent_information.position_a).looking_to(orca.normal, Vec3::Y);
+    //
+    //    gizmos.rect(
+    //        orca.origin + agent_information.position_a,
+    //        transfrom.rotation,
+    //        Vec2::ONE * 100.0,
+    //        Color::BLUE,
+    //    );
 }
