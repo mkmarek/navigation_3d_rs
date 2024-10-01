@@ -1,19 +1,18 @@
 use std::{collections::HashMap, f32::consts::PI};
 
 use bevy_math::{EulerRot, Mat4, Vec3};
-use bevy_render::color::Color;
-use geometry::{colliders::Collider, Aabb, Plane, Triangle};
+use geometry::{colliders::Collider, Aabb, Plane, Triangle, Vec3Operations};
 
 use crate::{Agent3D, EPSILON};
 
 pub struct FormationVelocityObstacle3D {
-    pub relative_position: Vec3,
-    pub relative_velocity: Vec3,
-    pub formation_collider: Collider,
-    pub obstacle_collider: Collider,
-    pub formation_velocity: Vec3,
-    pub formation_position: Vec3,
-    pub time_horizon: f32,
+    relative_position: Vec3,
+    obstacle_velocity: Vec3,
+    formation_collider: Collider,
+    obstacle_collider: Collider,
+    formation_velocity: Vec3,
+    formation_position: Vec3,
+    time_horizon: f32,
 }
 
 impl FormationVelocityObstacle3D {
@@ -24,12 +23,12 @@ impl FormationVelocityObstacle3D {
         let obstacle_collider = agent_other.shape.clone();
         let formation_collider = formation.shape.clone();
         let relative_position = agent_other.position - formation.position;
-        let relative_velocity = agent_other.velocity - formation.velocity;
+        let obstacle_velocity = agent_other.velocity;
         let formation_velocity = formation.velocity;
 
         Self {
             relative_position,
-            relative_velocity,
+            obstacle_velocity,
             formation_collider,
             obstacle_collider,
             formation_velocity,
@@ -46,12 +45,26 @@ impl FormationVelocityObstacle3D {
         number_of_yaw_samples: u16,
         number_of_pitch_samples: u16,
         roll: f32,
-        gizmos: &mut bevy_gizmos::gizmos::Gizmos,
     ) -> Plane {
         let triangles =
             self.construct_vo_mesh(number_of_yaw_samples, number_of_pitch_samples, roll);
 
-        Plane::new(Vec3::ZERO, Vec3::ZERO)
+        let mut min_distance = f32::MAX;
+        let mut point = Vec3::ZERO;
+        let mut normal = Vec3::ZERO;
+
+        for triangle in triangles {
+            let (pt, n) = triangle.closest_point_and_normal(self.formation_velocity);
+            let distance = (pt - self.formation_velocity).length_squared();
+
+            if distance + EPSILON < min_distance {
+                min_distance = distance;
+                point = pt;
+                normal = n;
+            }
+        }
+
+        Plane::new(point, normal)
     }
 
     #[must_use]
@@ -70,13 +83,11 @@ impl FormationVelocityObstacle3D {
         while let Some((yaw_step, pitch_step)) = points_to_process.pop() {
             let (start, end) = points[&(*yaw_step, *pitch_step)];
 
-            let top_neighbor =
-                points.get(&(*yaw_step, (pitch_step + 1) % (number_of_pitch_samples + 1)));
-            let right_neighbor =
-                points.get(&((yaw_step + 1) % (number_of_yaw_samples + 1), *pitch_step));
+            let top_neighbor = points.get(&(*yaw_step, (pitch_step + 1) % number_of_pitch_samples));
+            let right_neighbor = points.get(&((yaw_step + 1) % number_of_yaw_samples, *pitch_step));
             let top_right_neighbor = points.get(&(
-                (yaw_step + 1) % (number_of_yaw_samples + 1),
-                (pitch_step + 1) % (number_of_pitch_samples + 1),
+                (yaw_step + 1) % number_of_yaw_samples,
+                (pitch_step + 1) % number_of_pitch_samples,
             ));
 
             match (top_neighbor, right_neighbor, top_right_neighbor) {
@@ -92,8 +103,10 @@ impl FormationVelocityObstacle3D {
                     let (right_start, right_end) = right;
                     let (top_right_start, top_right_end) = top_right;
 
+                    // here it is
+
                     triangles.push(Triangle::new([start, *right_start, *top_right_start]));
-                    triangles.push(Triangle::new([end, *right_end, *top_right_end]));
+                    triangles.push(Triangle::new([end, *top_right_end, *right_end]));
                     triangles.push(Triangle::new([start, *top_right_start, end]));
                     triangles.push(Triangle::new([*top_right_start, *top_right_end, end]));
                 }
@@ -201,14 +214,14 @@ impl FormationVelocityObstacle3D {
 
         let mut points = HashMap::new();
 
-        for yaw_step in 0..=number_of_yaw_samples {
+        for yaw_step in 0..number_of_yaw_samples {
             let yaw = Self::lerp(
                 -PI,
                 PI,
                 f32::from(yaw_step) / f32::from(number_of_yaw_samples),
             );
 
-            for pitch_step in 0..=number_of_pitch_samples {
+            for pitch_step in 0..number_of_pitch_samples {
                 let pitch = Self::lerp(
                     -PI / 2.0,
                     PI / 2.0,
@@ -223,7 +236,7 @@ impl FormationVelocityObstacle3D {
 
                 let (y_side_min_t, y_side_max_t) = {
                     let position_dot_v = self.relative_position.dot(top);
-                    let velocity_dot_v = self.relative_velocity.dot(top);
+                    let velocity_dot_v = self.obstacle_velocity.dot(top);
                     let position_dot_v_abs = position_dot_v.abs();
                     let velocity_dot_v_abs = velocity_dot_v.abs();
 
@@ -267,7 +280,7 @@ impl FormationVelocityObstacle3D {
 
                 let (x_side_min_t, x_side_max_t) = {
                     let position_dot_w = self.relative_position.dot(left);
-                    let velocity_dot_w = self.relative_velocity.dot(left);
+                    let velocity_dot_w = self.obstacle_velocity.dot(left);
                     let velocity_dot_w_abs = velocity_dot_w.abs();
                     let position_dot_w_abs = position_dot_w.abs();
 
@@ -323,11 +336,11 @@ impl FormationVelocityObstacle3D {
                     continue;
                 }
 
-                let l1_0 = front.dot(self.relative_velocity)
+                let l1_0 = front.dot(self.obstacle_velocity)
                     + (self.relative_position.dot(front) - collider_shape.half_sizes.z) / min_t;
                 let l1_1 = 2.0 * collider_shape.half_sizes.z / min_t;
 
-                let l2_0 = front.dot(self.relative_velocity)
+                let l2_0 = front.dot(self.obstacle_velocity)
                     + (self.relative_position.dot(front) + collider_shape.half_sizes.z) / max_t;
                 let l2_1 = 2.0 * collider_shape.half_sizes.z / max_t;
 

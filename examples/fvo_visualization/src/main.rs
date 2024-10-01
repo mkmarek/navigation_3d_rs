@@ -218,9 +218,16 @@ fn draw_velocity_obstacle(
     );
 
     for triangle in &triangles {
-        gizmos.line(triangle[0], triangle[1], Color::GREEN);
-        gizmos.line(triangle[1], triangle[2], Color::GREEN);
-        gizmos.line(triangle[2], triangle[0], Color::GREEN);
+        let color = Color::GREEN;
+        gizmos.line(triangle[0], triangle[1], color);
+        gizmos.line(triangle[1], triangle[2], color);
+        gizmos.line(triangle[2], triangle[0], color);
+
+        gizmos.line(
+            triangle.centroid(),
+            triangle.centroid() + triangle.normal() * 30.0,
+            color,
+        );
     }
 
     let collision_mesh = meshes.get_mut(query.single().1).unwrap();
@@ -258,34 +265,24 @@ fn draw_velocity_obstacle(
             .collect::<Vec<_>>(),
     );
 
-    //let orca = fvo.orca_plane(
-    //    0.1,
-    //    agent_information.fvo_resolution,
-    //    agent_information.fvo_resolution,
-    //    0.0,
-    //    &mut gizmos,
-    //);
+    let orca = fvo.orca_plane(
+        0.1,
+        agent_information.fvo_resolution,
+        agent_information.fvo_resolution,
+        0.0,
+    );
 
-    //    gizmos.sphere(
-    //        orca.origin + agent_information.position_a,
-    //        Quat::IDENTITY,
-    //        1.0,
-    //        Color::BLUE,
-    //    );
-    //
-    //    gizmos.line(
-    //        orca.origin + agent_information.position_a,
-    //        orca.origin + agent_information.position_a + orca.normal * 100.0,
-    //        Color::BLUE,
-    //    );
-    //
-    //    let transfrom =
-    //        Transform::from_translation(agent_information.position_a).looking_to(orca.normal, Vec3::Y);
-    //
-    //    gizmos.rect(
-    //        orca.origin + agent_information.position_a,
-    //        transfrom.rotation,
-    //        Vec2::ONE * 100.0,
-    //        Color::BLUE,
-    //    );
+    gizmos.sphere(orca.origin, Quat::IDENTITY, 1.0, Color::BLUE);
+
+    gizmos.line(orca.origin, orca.origin + orca.normal * 100.0, Color::BLUE);
+
+    let transfrom =
+        Transform::from_translation(agent_information.position_a).looking_to(orca.normal, Vec3::Y);
+
+    gizmos.rect(
+        orca.origin,
+        transfrom.rotation,
+        Vec2::ONE * 100.0,
+        Color::BLUE,
+    );
 }
