@@ -1,4 +1,9 @@
-use std::{fmt::Debug, ops::Mul};
+use std::{
+    fmt::Debug,
+    ops::{Div, Mul, MulAssign, Sub},
+};
+
+use bevy_math::Vec3;
 
 use crate::EPSILON;
 
@@ -130,6 +135,10 @@ impl Matrix {
         self.data.get(row, col)
     }
 
+    pub fn set(&mut self, row: usize, col: usize, value: f32) -> Option<()> {
+        self.data.set(row, col, value)
+    }
+
     pub fn mul_left(&self, rhs: &Matrix) -> Option<Matrix> {
         if self.data.cols() != rhs.data.rows() {
             return None;
@@ -148,6 +157,18 @@ impl Matrix {
         }
 
         Some(Matrix::new(data, rhs.data.cols(), self.data.rows()))
+    }
+
+    pub fn mul_vec3(&self, vector: Vec3) -> Vec3 {
+        assert_eq!(self.data.cols(), 3);
+
+        let mut result = Vec3::ZERO;
+        for i in 0..3 {
+            for j in 0..3 {
+                result[i] += self.data.get_unchecked(i, j) * vector[j];
+            }
+        }
+        result
     }
 
     pub fn inverse(&self) -> Option<Matrix> {
@@ -402,6 +423,85 @@ impl Matrix {
         // Multiply R^{-1} * Q^T
         r_inv.mul_left(&q).expect("Matrix cannot be multiplied")
     }
+
+    pub fn add(&mut self, rhs: &Matrix) -> Option<()> {
+        if self.data.cols() != rhs.data.cols() || self.data.rows() != rhs.data.rows() {
+            return None;
+        }
+
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                let value = self.data.get_unchecked(i, j) + rhs.data.get_unchecked(i, j);
+                self.data.set_unchecked(i, j, value);
+            }
+        }
+
+        Some(())
+    }
+
+    pub fn element_wise_product(&mut self, rhs: &Matrix) -> Option<()> {
+        if self.data.cols() != rhs.data.cols() || self.data.rows() != rhs.data.rows() {
+            return None;
+        }
+
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                let value = self.data.get_unchecked(i, j) * rhs.data.get_unchecked(i, j);
+                self.data.set_unchecked(i, j, value);
+            }
+        }
+
+        Some(())
+    }
+
+    pub fn element_wise_powi(&mut self, exp: i32) {
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                let value = self.data.get_unchecked(i, j).powi(exp);
+                self.data.set_unchecked(i, j, value);
+            }
+        }
+    }
+
+    pub fn abs(&mut self) {
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                let value = self.data.get_unchecked(i, j).abs();
+                self.data.set_unchecked(i, j, value);
+            }
+        }
+    }
+
+    pub fn sum(&self) -> f32 {
+        let mut sum = 0.0;
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                sum += self.data.get_unchecked(i, j);
+            }
+        }
+        sum
+    }
+}
+
+impl Sub<&Matrix> for &Matrix {
+    type Output = Option<Matrix>;
+
+    fn sub(self, rhs: &Matrix) -> Self::Output {
+        if self.data.cols() != rhs.data.cols() || self.data.rows() != rhs.data.rows() {
+            return None;
+        }
+
+        let mut clone = self.clone();
+
+        for i in 0..clone.data.rows() {
+            for j in 0..clone.data.cols() {
+                let value = clone.data.get_unchecked(i, j) - rhs.data.get_unchecked(i, j);
+                clone.data.set_unchecked(i, j, value);
+            }
+        }
+
+        Some(clone)
+    }
 }
 
 impl Mul<Matrix> for Matrix {
@@ -409,6 +509,34 @@ impl Mul<Matrix> for Matrix {
 
     fn mul(self, rhs: Matrix) -> Self::Output {
         self.mul_left(&rhs)
+    }
+}
+
+impl Div<f32> for Matrix {
+    type Output = Matrix;
+
+    fn div(self, rhs: f32) -> Self::Output {
+        let mut clone = self.clone();
+
+        for i in 0..clone.data.rows() {
+            for j in 0..clone.data.cols() {
+                let value = clone.data.get_unchecked(i, j) / rhs;
+                clone.data.set_unchecked(i, j, value);
+            }
+        }
+
+        clone
+    }
+}
+
+impl MulAssign<f32> for Matrix {
+    fn mul_assign(&mut self, rhs: f32) {
+        for i in 0..self.data.rows() {
+            for j in 0..self.data.cols() {
+                let value = self.data.get_unchecked(i, j) * rhs;
+                self.data.set_unchecked(i, j, value);
+            }
+        }
     }
 }
 

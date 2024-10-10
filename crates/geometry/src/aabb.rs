@@ -13,6 +13,19 @@ impl Aabb {
     pub fn new(center: Vec3, half_sizes: Vec3) -> Self {
         Self { center, half_sizes }
     }
+
+    pub fn merge(&mut self, other: &Self) {
+        let min = self.center - self.half_sizes;
+        let max = self.center + self.half_sizes;
+        let other_min = other.center - other.half_sizes;
+        let other_max = other.center + other.half_sizes;
+
+        let new_min = min.min(other_min);
+        let new_max = max.max(other_max);
+
+        self.center = (new_min + new_max) / 2.0;
+        self.half_sizes = (new_max - new_min) / 2.0;
+    }
 }
 
 impl Vec3Operations for Aabb {
