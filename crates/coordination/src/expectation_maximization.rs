@@ -1,7 +1,9 @@
-use std::f32::consts::TAU;
+use std::{collections::HashMap, f32::consts::TAU};
 
 use bevy_math::Vec3;
 use geometry::Ray3D;
+
+use crate::hungarian::hungarian;
 
 fn probability_density_function_of_formation(
     value: Vec3,
@@ -32,6 +34,28 @@ fn combine(values: &[&[Vec3]], coefficients: &[f32]) -> Vec<Vec3> {
     result
 }
 
+fn best_matching_indexes(a: &[Vec3], b: &[Vec3]) -> HashMap<usize, usize> {
+    let matrix = a
+        .iter()
+        .map(|&a| {
+            b.iter()
+                .map(|&b| a.distance_squared(b))
+                .collect::<Vec<f32>>()
+        })
+        .collect::<Vec<Vec<f32>>>();
+
+    let refs = matrix.iter().map(|e| e.as_slice()).collect::<Vec<&[f32]>>();
+
+    let result = hungarian(&refs);
+
+    let mut map = HashMap::new();
+    for (i, j, _) in result {
+        map.insert(i, j);
+    }
+
+    map
+}
+
 pub fn expectation_maximization_1d(
     values: &[Vec3],
     formation_templates: &[&[Vec3]],
@@ -48,6 +72,8 @@ pub fn expectation_maximization_1d(
     loop {
         // Calculate probabilities of each value belonging to each Gaussian
         let mut probabilities = Vec::new();
+        let best_matches =
+            best_matching_indexes(values, &combine(formation_templates, &coefficients));
 
         let formation_parts_on_current_coefficients = formation_templates
             .iter()
@@ -64,8 +90,8 @@ pub fn expectation_maximization_1d(
 
                 let a = probability_density_function_of_formation(
                     value,
-                    formation_parts[i],
-                    formation_templates[k][i],
+                    formation_parts[best_matches[&i]],
+                    formation_templates[k][best_matches[&i]],
                     std_deviation,
                 ) + 10e-6;
 
@@ -87,12 +113,13 @@ pub fn expectation_maximization_1d(
             let mut denominator = 0.0;
 
             for i in 0..values.len() {
-                let ideal_parameter = if formation_templates[k][i].length_squared() < f32::EPSILON {
-                    0.0
-                } else {
-                    let line = Ray3D::new(Vec3::ZERO, formation_templates[k][i]);
-                    line.parameter_at_point(values[i])
-                };
+                let ideal_parameter =
+                    if formation_templates[k][best_matches[&i]].length_squared() < f32::EPSILON {
+                        0.0
+                    } else {
+                        let line = Ray3D::new(Vec3::ZERO, formation_templates[k][best_matches[&i]]);
+                        line.parameter_at_point(values[i])
+                    };
 
                 coefficient += ideal_parameter * probabilities[i * n_templates + k];
                 denominator += probabilities[i * n_templates + k];
@@ -241,29 +268,61 @@ mod tests {
         ];
 
         let mut rng = rand::thread_rng();
-        let values =
-            combine_with_randomness(&formation_templates, &[0.4, 0.5, 0.1], &mut rng, 200.0);
 
-        let result = expectation_maximization_1d(
-            &values,
-            &formation_templates
-                .iter()
-                .map(|e| e.as_slice())
-                .collect::<Vec<&[Vec3]>>(),
-            20000,
-        );
+        let first_largest =
+            combine_with_randomness(&formation_templates, &[0.8, 0.1, 0.1], &mut rng, 10.0);
 
-        let least_squares_result = least_squares(
-            &values,
-            &formation_templates
-                .iter()
-                .map(|e| e.as_slice())
-                .collect::<Vec<&[Vec3]>>(),
-        );
+        let second_largest =
+            combine_with_randomness(&formation_templates, &[0.1, 0.8, 0.1], &mut rng, 10.0);
 
-        println!("Least Squares Result: {:?}", least_squares_result);
+        let third_largest =
+            combine_with_randomness(&formation_templates, &[0.1, 0.1, 0.8], &mut rng, 10.0);
 
-        assert_eq!(result.len(), 2);
-        panic!("{:?}", result);
+        let values = [first_largest, second_largest, third_largest];
+
+        let results = values
+            .iter()
+            .map(|value| {
+                expectation_maximization_1d(
+                    value,
+                    &formation_templates
+                        .iter()
+                        .map(|e| e.as_slice())
+                        .collect::<Vec<&[Vec3]>>(),
+                    200,
+                )
+            })
+            .collect::<Vec<Vec<f32>>>();
+
+        let first_result = results[0].clone();
+        let second_result = results[1].clone();
+        let third_result = results[2].clone();
+
+        // We expect three results for each value
+        assert_eq!(first_result.len(), 3);
+        assert_eq!(second_result.len(), 3);
+        assert_eq!(third_result.len(), 3);
+
+        // Each result should be a probability between 0 and 1
+        assert!(first_result.iter().all(|&e| e >= 0.0 && e <= 1.0));
+        assert!(second_result.iter().all(|&e| e >= 0.0 && e <= 1.0));
+        assert!(third_result.iter().all(|&e| e >= 0.0 && e <= 1.0));
+
+        // The sum of the probabilities should be 1
+        assert!(first_result.iter().sum::<f32>() - 1.0 < 10e-6);
+        assert!(second_result.iter().sum::<f32>() - 1.0 < 10e-6);
+        assert!(third_result.iter().sum::<f32>() - 1.0 < 10e-6);
+
+        // The first result should have the first entry as the largest
+        assert!(first_result[0] > first_result[1]);
+        assert!(first_result[0] > first_result[2]);
+
+        // The second result should have the second entry as the largest
+        assert!(second_result[1] > second_result[0]);
+        assert!(second_result[1] > second_result[2]);
+
+        // The third result should have the third entry as the largest
+        assert!(third_result[2] > third_result[0]);
+        assert!(third_result[2] > third_result[1]);
     }
 }
