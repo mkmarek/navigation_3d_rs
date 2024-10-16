@@ -1,11 +1,13 @@
 use bevy::{prelude::*, sprite::Material2dPlugin};
 
 mod grid_background;
+mod grid_skybox;
 mod plane_material;
 mod universal_camera;
 mod velocity_plot;
 
 pub use grid_background::GridTexture;
+pub use grid_skybox::SkyboxPlugin;
 pub use plane_material::PlaneMaterial;
 pub use universal_camera::CameraTarget;
 pub use universal_camera::UniversalCamera;

@@ -11,7 +11,6 @@ pub struct FormationVelocityObstacle3D {
     formation_collider: Collider,
     obstacle_collider: Collider,
     formation_velocity: Vec3,
-    formation_position: Vec3,
     time_horizon: f32,
 }
 
@@ -32,7 +31,6 @@ impl FormationVelocityObstacle3D {
             formation_collider,
             obstacle_collider,
             formation_velocity,
-            formation_position: formation.position,
             time_horizon,
         }
     }
@@ -41,7 +39,6 @@ impl FormationVelocityObstacle3D {
     #[allow(clippy::too_many_lines)]
     pub fn orca_plane(
         &self,
-        _time_step: f32,
         number_of_yaw_samples: u16,
         number_of_pitch_samples: u16,
         roll: f32,

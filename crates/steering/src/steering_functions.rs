@@ -181,7 +181,7 @@ pub fn follow_path(
     };
 
     // The lookeahead should be a bit larger than the turning radius of the agent
-    // to compensate with any innacuracies in computation
+    // to compensate with any inaccuracies in computation
     let lookahead = (min_tangent * LOOKAHEAD_TURN_MULTIPLIER).max(1.0);
 
     let (lookahead_parameter, lookahead_index) = {

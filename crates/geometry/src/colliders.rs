@@ -23,7 +23,7 @@ impl Collider {
     pub fn get_secant_plane(&self, point: Vec3) -> Plane {
         match self {
             Collider::Sphere(sphere) => sphere.get_secant_plane(point),
-            Collider::Aabb(aabb) => todo!(),
+            Collider::Aabb(_aabb) => todo!(),
         }
     }
 

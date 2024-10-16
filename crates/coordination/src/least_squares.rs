@@ -1,6 +1,7 @@
 use bevy_math::Vec3;
 use geometry::Matrix;
 
+#[allow(dead_code)]
 pub fn least_squares(measured_values: &[Vec3], independent_variables: &[&[Vec3]]) -> Matrix {
     let f_matrix = Matrix::new(
         measured_values

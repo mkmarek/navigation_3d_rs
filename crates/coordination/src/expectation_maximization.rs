@@ -56,11 +56,11 @@ fn best_matching_indexes(a: &[Vec3], b: &[Vec3]) -> HashMap<usize, usize> {
     map
 }
 
-pub fn expectation_maximization_1d(
+pub fn expectation_maximization(
     values: &[Vec3],
     formation_templates: &[&[Vec3]],
     max_steps: usize,
-) -> Vec<f32> {
+) -> (Vec<f32>, f32) {
     let n_templates = formation_templates.len();
     let n_values = values.len();
 
@@ -167,7 +167,7 @@ pub fn expectation_maximization_1d(
         }
     }
 
-    coefficients
+    (coefficients, std_deviation)
 }
 
 #[cfg(test)]
@@ -219,6 +219,15 @@ mod tests {
 
             result.push(sum);
         }
+
+        // shuffle the result
+        result.sort_by(|_, _| {
+            if rng.gen_bool(0.5) {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Greater
+            }
+        });
 
         result
     }
@@ -283,7 +292,7 @@ mod tests {
         let results = values
             .iter()
             .map(|value| {
-                expectation_maximization_1d(
+                expectation_maximization(
                     value,
                     &formation_templates
                         .iter()
@@ -291,6 +300,7 @@ mod tests {
                         .collect::<Vec<&[Vec3]>>(),
                     200,
                 )
+                .0
             })
             .collect::<Vec<Vec<f32>>>();
 

@@ -42,7 +42,7 @@ pub fn incremental_optimization_3d(
     for i in 0..planes.len() {
         let plane = &planes[i];
 
-        // Check if the velocity is inside the the zone of the plane
+        // Check if the velocity is inside the zone of the plane
         // If it is, we can skip this plane
         if plane.contains(optimal_velocity) {
             continue;

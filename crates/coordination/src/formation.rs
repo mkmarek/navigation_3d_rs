@@ -14,7 +14,7 @@ impl Formation {
         &self.positions
     }
 
-    pub fn get_bounds(&self) -> Aabb {
+    pub fn get_bounds(&self, agent_radius: f32) -> Aabb {
         let mut min = Vec3::splat(f32::INFINITY);
         let mut max = Vec3::splat(f32::NEG_INFINITY);
 
@@ -22,6 +22,9 @@ impl Formation {
             min = min.min(position);
             max = max.max(position);
         }
+
+        min -= Vec3::splat(agent_radius);
+        max += Vec3::splat(agent_radius);
 
         let center = (min + max) / 2.0;
         let half_sizes = (max - min) / 2.0;
@@ -33,22 +36,5 @@ impl Formation {
         for position in self.positions.iter_mut() {
             *position *= scale;
         }
-    }
-
-    pub fn get_closest_pairs(&self, other: &Self) -> Vec<(usize, usize)> {
-        let mut pairs = Vec::new();
-        for (i, position) in self.positions.iter().enumerate() {
-            let mut closest = f32::INFINITY;
-            let mut closest_index = 0;
-            for (j, other_position) in other.positions.iter().enumerate() {
-                let distance = position.distance_squared(*other_position);
-                if distance < closest {
-                    closest = distance;
-                    closest_index = j;
-                }
-            }
-            pairs.push((i, closest_index));
-        }
-        pairs
     }
 }

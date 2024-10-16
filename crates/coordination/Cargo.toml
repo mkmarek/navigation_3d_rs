@@ -5,6 +5,7 @@ edition = "2021"
 
 [dependencies]
 geometry = { path = "../geometry" }
+orca = { path = "../orca" }
 
 bevy_math = { workspace = true }
 bevy_gizmos = { workspace = true }

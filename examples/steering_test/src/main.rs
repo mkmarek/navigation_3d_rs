@@ -1,8 +1,10 @@
 use std::{f32::consts, ops::Range};
 
-use bevy::prelude::*;
+use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
 use bevy_egui::EguiPlugin;
-use example_utils::{CameraTarget, UniversalCamera, UniversalCameraPlugin, UtilsPlugin};
+use example_utils::{
+    CameraTarget, SkyboxPlugin, UniversalCamera, UniversalCameraPlugin, UtilsPlugin,
+};
 use geometry::{colliders::Collider, Plane, Sphere, Vec3Operations};
 use orca::{optimize_velocity_3d, AccelerationVelocityObstacle3D, Agent3D};
 use rand::{thread_rng, Rng};
@@ -37,6 +39,7 @@ fn main() {
             }),
             UtilsPlugin,
             UniversalCameraPlugin,
+            SkyboxPlugin,
             EguiPlugin,
         ))
         .add_systems(Startup, setup)
@@ -103,6 +106,10 @@ fn setup(
     commands
         .spawn((
             Camera3dBundle {
+                camera_3d: Camera3d {
+                    clear_color: ClearColorConfig::None,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             UniversalCamera::Orbit {

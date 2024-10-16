@@ -1428,6 +1428,7 @@ dependencies = [
  "bevy_math",
  "bevy_render",
  "geometry",
+ "orca",
  "rand",
 ]
 
@@ -1986,6 +1987,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e13624c2627564efccf4934284bdd98cbaa14e79b0b5a141218e507b3a823456"
 dependencies = [
  "percent-encoding",
+]
+
+[[package]]
+name = "formation_overview"
+version = "0.1.0"
+dependencies = [
+ "bevy",
+ "bevy_egui",
+ "coordination",
+ "example_utils",
+ "geometry",
+ "orca",
+ "rand",
+ "steering",
 ]
 
 [[package]]

@@ -28,7 +28,7 @@ impl Material for PlaneMaterial {
 
     fn specialize(
         _pipeline: &bevy::pbr::MaterialPipeline<Self>,
-        descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
+        _descriptor: &mut bevy::render::render_resource::RenderPipelineDescriptor,
         _layout: &bevy::render::mesh::MeshVertexBufferLayout,
         _key: bevy::pbr::MaterialPipelineKey<Self>,
     ) -> Result<(), bevy::render::render_resource::SpecializedMeshPipelineError> {

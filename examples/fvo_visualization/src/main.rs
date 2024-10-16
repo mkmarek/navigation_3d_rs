@@ -266,7 +266,6 @@ fn draw_velocity_obstacle(
     );
 
     let orca = fvo.orca_plane(
-        0.1,
         agent_information.fvo_resolution,
         agent_information.fvo_resolution,
         0.0,
