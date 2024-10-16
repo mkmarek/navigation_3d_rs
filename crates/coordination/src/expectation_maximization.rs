@@ -155,11 +155,6 @@ pub fn expectation_maximization(
             break;
         }
 
-        println!(
-            "Step: {}, Coefficients: {:?}, Std Deviation: {}",
-            steps, coefficients, std_deviation
-        );
-
         steps += 1;
 
         if steps >= max_steps {
