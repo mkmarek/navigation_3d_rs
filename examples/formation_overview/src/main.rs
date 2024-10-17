@@ -1,5 +1,7 @@
-use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*};
+use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*, window::PresentMode};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
+use bevy_mod_picking::DefaultPickingPlugins;
+use bevy_transform_gizmo::TransformGizmoPlugin;
 use coordination::{
     formations::{CircleFormation, LineFormation, QueueFormation, VFormation},
     Formation, FormationTemplate, FormationTemplateSet,
@@ -7,6 +9,8 @@ use coordination::{
 use example_utils::{
     CameraTarget, SkyboxPlugin, UniversalCamera, UniversalCameraPlugin, UtilsPlugin,
 };
+use geometry::colliders::Collider;
+use orca::Agent3D;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum FormationType {
@@ -191,7 +195,7 @@ fn main() {
             DefaultPlugins
                 .set(WindowPlugin {
                     primary_window: Some(Window {
-                        resizable: false,
+                        present_mode: PresentMode::Immediate,
                         ..default()
                     }),
                     ..default()
@@ -203,6 +207,8 @@ fn main() {
             EguiPlugin,
             UniversalCameraPlugin,
             SkyboxPlugin,
+            DefaultPickingPlugins,
+            TransformGizmoPlugin::default(),
             UtilsPlugin,
         ))
         .insert_resource(FormationSettings::default())
@@ -212,7 +218,11 @@ fn main() {
         .run();
 }
 
-fn setup(mut commands: Commands) {
+fn setup(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     commands.spawn((
         Camera3dBundle {
             camera_3d: Camera3d {
@@ -228,12 +238,40 @@ fn setup(mut commands: Commands) {
             radius: 1000.0,
             locked_cursor_position: None,
         },
+        bevy_transform_gizmo::GizmoPickSource::default(),
     ));
 
     commands.spawn(DirectionalLightBundle { ..default() });
 }
 
-fn draw_ui(mut contexts: EguiContexts, mut formation_settings: ResMut<FormationSettings>) {
+#[derive(Component)]
+struct Obstacle;
+
+fn spawn_obstacle(
+    commands: &mut Commands,
+    meshes: &mut ResMut<Assets<Mesh>>,
+    materials: &mut ResMut<Assets<StandardMaterial>>,
+) {
+    commands.spawn((
+        PbrBundle {
+            mesh: meshes.add(Mesh::from(shape::UVSphere::default())),
+            material: materials.add(Color::rgb(0.8, 0.8, 0.8).into()),
+            transform: Transform::from_xyz(0.0, 0.0, 1000.0).with_scale(Vec3::splat(100.0)),
+            ..Default::default()
+        },
+        bevy_mod_picking::PickableBundle::default(),
+        bevy_transform_gizmo::GizmoTransformable,
+        Obstacle,
+    ));
+}
+
+fn draw_ui(
+    mut contexts: EguiContexts,
+    mut formation_settings: ResMut<FormationSettings>,
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
     egui::Window::new("Controls").show(contexts.ctx_mut(), |ui| {
         ui.label("Number of Agents");
         ui.add(egui::Slider::new(
@@ -283,6 +321,16 @@ fn draw_ui(mut contexts: EguiContexts, mut formation_settings: ResMut<FormationS
             FormationType::V => draw_v_formation_ui(ui, &mut formation_settings),
             FormationType::Queue => draw_queue_formation_ui(ui, &mut formation_settings),
             FormationType::Combined => draw_combined_formation_ui(ui, &mut formation_settings),
+        }
+
+        ui.separator();
+
+        if ui
+            .button("Spawn Obstacle")
+            .on_hover_text("Spawns an obstacle")
+            .clicked()
+        {
+            spawn_obstacle(&mut commands, &mut meshes, &mut materials);
         }
     });
 }
@@ -403,7 +451,22 @@ fn draw_v_formation_ui(ui: &mut egui::Ui, formation_settings: &mut FormationSett
     ));
 }
 
-fn draw_formations(mut gizmos: Gizmos, formation_settings: Res<FormationSettings>) {
+fn draw_formations(
+    mut gizmos: Gizmos,
+    formation_settings: Res<FormationSettings>,
+    obstacles: Query<(&Transform, &Obstacle)>,
+) {
+    let obstale_agents = obstacles
+        .iter()
+        .map(|(transform, _)| {
+            Agent3D::new(
+                transform.translation,
+                Vec3::ZERO,
+                Collider::new_sphere(transform.scale.x),
+            )
+        })
+        .collect::<Vec<_>>();
+
     let formation_template =
         formation_settings.get_formation_template(formation_settings.selected_formation);
 
@@ -443,7 +506,7 @@ fn draw_formations(mut gizmos: Gizmos, formation_settings: Res<FormationSettings
         Vec3::Z * 100.0,
         100.0,
         formation_settings.deformation_penalty_multiplier,
-        &[],
+        &obstale_agents,
         formation_settings.obstacle_avoidance_time_horizon,
         formation_settings.number_of_yaw_samples,
         formation_settings.number_of_pitch_samples,

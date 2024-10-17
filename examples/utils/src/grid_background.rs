@@ -59,33 +59,34 @@ pub fn update_grid_texture_materials(
         return;
     }
 
-    let (camera_transform, camera) = camera_query.single();
+    for (camera_transform, camera) in camera_query.iter() {
+        for (grid_texture_handle, mut transform) in query.iter_mut() {
+            let viewport = camera.logical_viewport_size().unwrap();
+            let top_left =
+                camera.viewport_to_world_2d(camera_transform, Vec2::new(0.0, viewport.y));
+            let right_bottom =
+                camera.viewport_to_world_2d(camera_transform, Vec2::new(viewport.x, 0.0));
 
-    for (grid_texture_handle, mut transform) in query.iter_mut() {
-        let viewport = camera.logical_viewport_size().unwrap();
-        let top_left = camera.viewport_to_world_2d(camera_transform, Vec2::new(0.0, viewport.y));
-        let right_bottom =
-            camera.viewport_to_world_2d(camera_transform, Vec2::new(viewport.x, 0.0));
+            if top_left.is_none() || right_bottom.is_none() {
+                continue;
+            }
 
-        if top_left.is_none() || right_bottom.is_none() {
-            continue;
+            let top_left = top_left.unwrap();
+            let right_bottom = right_bottom.unwrap();
+
+            let grid_texture = materials.get_mut(grid_texture_handle).unwrap();
+            let camera_world_size = (right_bottom - top_left).abs();
+
+            grid_texture.resolution = viewport;
+            grid_texture.scale = camera_world_size;
+            grid_texture.position_offset = top_left;
+            let camera_translation = camera_transform.translation().truncate();
+            transform.translation = Vec3::new(
+                camera_translation.x,
+                camera_translation.y,
+                transform.translation.z,
+            );
+            transform.scale = Vec3::new(camera_world_size.x, camera_world_size.y, 1.0);
         }
-
-        let top_left = top_left.unwrap();
-        let right_bottom = right_bottom.unwrap();
-
-        let grid_texture = materials.get_mut(grid_texture_handle).unwrap();
-        let camera_world_size = (right_bottom - top_left).abs();
-
-        grid_texture.resolution = viewport;
-        grid_texture.scale = camera_world_size;
-        grid_texture.position_offset = top_left;
-        let camera_translation = camera_transform.translation().truncate();
-        transform.translation = Vec3::new(
-            camera_translation.x,
-            camera_translation.y,
-            transform.translation.z,
-        );
-        transform.scale = Vec3::new(camera_world_size.x, camera_world_size.y, 1.0);
     }
 }
