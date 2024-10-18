@@ -1,4 +1,6 @@
-use bevy_math::Vec3;
+use bevy_gizmos::gizmos::Gizmos;
+use bevy_math::{Quat, Vec2, Vec3};
+use bevy_render::color::Color;
 use geometry::{colliders::Collider, Aabb};
 use orca::{optimize_velocity_3d, Agent3D, FormationVelocityObstacle3D};
 
@@ -57,6 +59,7 @@ impl<'a> FormationTemplateSet<'a> {
         number_of_yaw_samples: u16,
         number_of_pitch_samples: u16,
         max_steps_for_em: usize,
+        gizmos: &mut Gizmos,
     ) -> (Formation, Vec3) {
         let mut best_formation = None;
         let mut best_velocity = None;
@@ -74,22 +77,42 @@ impl<'a> FormationTemplateSet<'a> {
 
             let orca_planes = obtacles
                 .iter()
-                .map(|obstacle| {
-                    FormationVelocityObstacle3D::new(
+                .filter_map(|obstacle| {
+                    let vo = FormationVelocityObstacle3D::new(
                         &formation_agent,
                         obstacle,
                         obstacle_avoidance_time_horizon,
-                    )
-                    .orca_plane(
-                        number_of_yaw_samples,
-                        number_of_pitch_samples,
-                        0.0,
-                    )
+                    );
+
+                    //let triangles =
+                    //    vo.construct_vo_mesh(number_of_yaw_samples, number_of_pitch_samples, 0.0);
+
+                    //for triangle in &triangles {
+                    //    let color = Color::GREEN;
+                    //    gizmos.line(triangle[0], triangle[1], color);
+                    //    gizmos.line(triangle[1], triangle[2], color);
+                    //    gizmos.line(triangle[2], triangle[0], color);
+                    //}
+
+                    vo.orca_plane(number_of_yaw_samples, number_of_pitch_samples, 0.0)
                 })
                 .collect::<Vec<_>>();
 
-            let optimal_velocity =
-                optimize_velocity_3d(preffered_velocity, maximum_velocity, &orca_planes);
+            //for plane in &orca_planes {
+            //    let rotation = Quat::from_rotation_arc(Vec3::Z, plane.normal);
+            //    gizmos.rect(plane.origin, rotation, Vec2::splat(100.0), Color::RED);
+            //    gizmos.line(
+            //        plane.origin,
+            //        plane.origin + plane.normal * 100.0,
+            //        Color::YELLOW,
+            //    );
+            //}
+
+            let optimal_velocity = if orca_planes.is_empty() {
+                preffered_velocity
+            } else {
+                optimize_velocity_3d(preffered_velocity, maximum_velocity, &orca_planes)
+            };
 
             let fitness = template.get_priority() * optimal_velocity.dot(preffered_velocity);
 
@@ -121,7 +144,7 @@ impl<'a> FormationTemplateSet<'a> {
 
             let orca_planes = obtacles
                 .iter()
-                .map(|obstacle| {
+                .filter_map(|obstacle| {
                     FormationVelocityObstacle3D::new(
                         &formation_agent,
                         obstacle,

@@ -54,34 +54,25 @@ impl Vec3Operations for Aabb {
     fn closest_point_and_normal(&self, pt: Vec3) -> (Vec3, Vec3) {
         let min = self.center - self.half_sizes;
         let max = self.center + self.half_sizes;
-        let mut closest = pt;
-        let mut normal = Vec3::ZERO;
 
-        if pt.x < min.x {
-            closest.x = min.x;
-            normal = Vec3::new(-1.0, 0.0, 0.0);
-        } else if pt.x > max.x {
-            closest.x = max.x;
-            normal = Vec3::new(1.0, 0.0, 0.0);
+        let distance_to_top_face = (max.y - pt.y).abs();
+        let distance_to_bottom_face = (min.y - pt.y).abs();
+        let distance_to_front_face = (max.z - pt.z).abs();
+        let distance_to_back_face = (min.z - pt.z).abs();
+
+        if distance_to_top_face.min(distance_to_bottom_face)
+            < distance_to_front_face.min(distance_to_back_face)
+        {
+            if distance_to_top_face < distance_to_bottom_face {
+                (Vec3::new(pt.x, max.y, pt.z), Vec3::Y)
+            } else {
+                (Vec3::new(pt.x, min.y, pt.z), -Vec3::Y)
+            }
+        } else if distance_to_front_face < distance_to_back_face {
+            (Vec3::new(pt.x, pt.y, max.z), Vec3::Z)
+        } else {
+            (Vec3::new(pt.x, pt.y, min.z), -Vec3::Z)
         }
-
-        if pt.y < min.y {
-            closest.y = min.y;
-            normal = Vec3::new(0.0, -1.0, 0.0);
-        } else if pt.y > max.y {
-            closest.y = max.y;
-            normal = Vec3::new(0.0, 1.0, 0.0);
-        }
-
-        if pt.z < min.z {
-            closest.z = min.z;
-            normal = Vec3::new(0.0, 0.0, -1.0);
-        } else if pt.z > max.z {
-            closest.z = max.z;
-            normal = Vec3::new(0.0, 0.0, 1.0);
-        }
-
-        (closest, normal)
     }
 
     fn signed_distance(&self, pt: Vec3) -> f32 {

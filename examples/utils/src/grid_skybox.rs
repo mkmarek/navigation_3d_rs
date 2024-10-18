@@ -1,8 +1,7 @@
 use bevy::{
-    prelude::{App, FromWorld, Handle, Image, Plugin, QueryState, Resource, World},
+    prelude::{App, FromWorld, Plugin, QueryState, Resource, World},
     render::{
         color::Color,
-        extract_resource::{ExtractResource, ExtractResourcePlugin},
         main_graph::node::CAMERA_DRIVER,
         mesh::PrimitiveTopology,
         render_graph::{Node, NodeRunError, RenderGraph, RenderGraphContext},
@@ -11,9 +10,8 @@ use bevy::{
             BindingType, BlendState, BufferBindingType, ColorTargetState, ColorWrites, Face,
             FrontFace, LoadOp, MultisampleState, Operations, PipelineLayoutDescriptor, PolygonMode,
             PrimitiveState, RawFragmentState, RawRenderPipelineDescriptor, RawVertexState,
-            RenderPassDescriptor, RenderPipeline, SamplerBindingType, ShaderModuleDescriptor,
-            ShaderSource, ShaderStages, TextureFormat, TextureSampleType, TextureViewDimension,
-            UniformBuffer,
+            RenderPassDescriptor, RenderPipeline, ShaderModuleDescriptor, ShaderSource,
+            ShaderStages, TextureFormat, UniformBuffer,
         },
         renderer::{RenderContext, RenderDevice, RenderQueue},
         view::{ExtractedView, ViewTarget},
@@ -36,7 +34,7 @@ impl Plugin for SkyboxPlugin {
         graph.add_node_edge(RENDER_SKYBOX_NODE, CAMERA_DRIVER);
     }
 
-    fn build(&self, app: &mut App) {}
+    fn build(&self, _app: &mut App) {}
 }
 
 pub const RENDER_SKYBOX_NODE: &str = "render_skybox";

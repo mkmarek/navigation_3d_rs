@@ -93,11 +93,23 @@ impl Vec3Operations for Triangle {
             let distance_ca = (pt - closest_ca).length_squared();
 
             if distance_ab < distance_bc && distance_ab < distance_ca {
-                (closest_ab, self.plane.normal)
+                let normal = (pt - closest_ab).normalize();
+                if normal.dot(self.plane.normal) < 0.0 {
+                    return (closest_ab, -normal);
+                }
+                (closest_ab, normal)
             } else if distance_bc < distance_ca {
-                (closest_bc, self.plane.normal)
+                let normal = (pt - closest_bc).normalize();
+                if normal.dot(self.plane.normal) < 0.0 {
+                    return (closest_bc, -normal);
+                }
+                (closest_bc, normal)
             } else {
-                (closest_ca, self.plane.normal)
+                let normal = (pt - closest_ca).normalize();
+                if normal.dot(self.plane.normal) < 0.0 {
+                    return (closest_ca, -normal);
+                }
+                (closest_ca, normal)
             }
         }
     }

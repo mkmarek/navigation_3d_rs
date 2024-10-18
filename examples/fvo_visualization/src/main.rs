@@ -271,17 +271,19 @@ fn draw_velocity_obstacle(
         0.0,
     );
 
-    gizmos.sphere(orca.origin, Quat::IDENTITY, 1.0, Color::BLUE);
+    if let Some(orca) = orca {
+        gizmos.sphere(orca.origin, Quat::IDENTITY, 1.0, Color::BLUE);
 
-    gizmos.line(orca.origin, orca.origin + orca.normal * 100.0, Color::BLUE);
+        gizmos.line(orca.origin, orca.origin + orca.normal * 100.0, Color::BLUE);
 
-    let transfrom =
-        Transform::from_translation(agent_information.position_a).looking_to(orca.normal, Vec3::Y);
+        let transfrom = Transform::from_translation(agent_information.position_a)
+            .looking_to(orca.normal, Vec3::Y);
 
-    gizmos.rect(
-        orca.origin,
-        transfrom.rotation,
-        Vec2::ONE * 100.0,
-        Color::BLUE,
-    );
+        gizmos.rect(
+            orca.origin,
+            transfrom.rotation,
+            Vec2::ONE * 100.0,
+            Color::BLUE,
+        );
+    }
 }

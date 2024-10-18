@@ -42,7 +42,25 @@ impl FormationVelocityObstacle3D {
         number_of_yaw_samples: u16,
         number_of_pitch_samples: u16,
         roll: f32,
-    ) -> Plane {
+    ) -> Option<Plane> {
+        let collider_shape = {
+            let collider = self
+                .obstacle_collider
+                .minkowski_sum(&self.formation_collider);
+
+            match collider {
+                Collider::Sphere(sphere) => Aabb::new(sphere.origin, Vec3::splat(sphere.radius)),
+                Collider::Aabb(aabb) => aabb,
+            }
+        };
+
+        // If there is collision, we project on the boundary of the collider
+        let moved_shape = Aabb::new(self.relative_position, collider_shape.half_sizes);
+        if moved_shape.contains(Vec3::ZERO) {
+            let (pt, normal) = moved_shape.closest_point_and_normal(Vec3::ZERO);
+            return Some(Plane::new(pt, normal));
+        }
+
         let triangles =
             self.construct_vo_mesh(number_of_yaw_samples, number_of_pitch_samples, roll);
 
@@ -61,7 +79,11 @@ impl FormationVelocityObstacle3D {
             }
         }
 
-        Plane::new(point, normal)
+        if min_distance == f32::MAX {
+            return None;
+        }
+
+        Some(Plane::new(point, normal))
     }
 
     #[must_use]
@@ -211,14 +233,15 @@ impl FormationVelocityObstacle3D {
 
         let mut points = HashMap::new();
 
-        for yaw_step in 0..number_of_yaw_samples {
+        let mut most_min_t = f32::MAX;
+        for yaw_step in 0..=number_of_yaw_samples {
             let yaw = Self::lerp(
                 -PI,
                 PI,
                 f32::from(yaw_step) / f32::from(number_of_yaw_samples),
             );
 
-            for pitch_step in 0..number_of_pitch_samples {
+            for pitch_step in 0..=number_of_pitch_samples {
                 let pitch = Self::lerp(
                     -PI / 2.0,
                     PI / 2.0,
@@ -359,8 +382,10 @@ impl FormationVelocityObstacle3D {
                     continue;
                 }
 
-                let t_end = t_end.clamp(0.0, 10000.0);
+                let t_end = 10000.0;
                 let t_start = t_start.clamp(0.0, t_end);
+
+                most_min_t = most_min_t.min(t_start);
 
                 points.insert((yaw_step, pitch_step), (t_start * front, t_end * front));
             }

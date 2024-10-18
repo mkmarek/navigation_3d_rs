@@ -1,4 +1,7 @@
-use bevy::{core_pipeline::clear_color::ClearColorConfig, prelude::*, window::PresentMode};
+use bevy::{
+    core_pipeline::clear_color::ClearColorConfig, diagnostic::FrameTimeDiagnosticsPlugin,
+    prelude::*, window::PresentMode,
+};
 use bevy_egui::{egui, EguiContexts, EguiPlugin};
 use bevy_mod_picking::DefaultPickingPlugins;
 use bevy_transform_gizmo::TransformGizmoPlugin;
@@ -80,9 +83,9 @@ impl Default for FormationSettings {
             combined_v_formation_multiplier: 0.0,
             combined_queue_formation_multiplier: 0.0,
 
-            obstacle_avoidance_time_horizon: 10.0,
-            number_of_yaw_samples: 50,
-            number_of_pitch_samples: 50,
+            obstacle_avoidance_time_horizon: 5.0,
+            number_of_yaw_samples: 20,
+            number_of_pitch_samples: 20,
             max_steps_for_em: 100,
             deformation_penalty_multiplier: 0.0,
         }
@@ -204,6 +207,7 @@ fn main() {
                     file_path: "../../assets".to_string(),
                     ..Default::default()
                 }),
+            FrameTimeDiagnosticsPlugin,
             EguiPlugin,
             UniversalCameraPlugin,
             SkyboxPlugin,
@@ -218,11 +222,7 @@ fn main() {
         .run();
 }
 
-fn setup(
-    mut commands: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
+fn setup(mut commands: Commands) {
     commands.spawn((
         Camera3dBundle {
             camera_3d: Camera3d {
@@ -283,6 +283,12 @@ fn draw_ui(
         ui.add(egui::Slider::new(
             &mut formation_settings.agent_radius,
             1.0..=20.0,
+        ));
+
+        ui.label("Obstacle Avoidance Time Horizon");
+        ui.add(egui::Slider::new(
+            &mut formation_settings.obstacle_avoidance_time_horizon,
+            1.0..=50.0,
         ));
 
         ui.separator();
@@ -511,16 +517,34 @@ fn draw_formations(
         formation_settings.number_of_yaw_samples,
         formation_settings.number_of_pitch_samples,
         formation_settings.max_steps_for_em,
+        &mut gizmos,
     );
 
     gizmos.line(aabb.center, aabb.center + best_velocity, Color::BLUE);
 
+    let rotation = Quat::from_rotation_arc(Vec3::Z, best_velocity.normalize());
+
     for position in best_formation.get_positions() {
+        let p = if rotation.is_near_identity() {
+            *position
+        } else {
+            rotation * *position
+        };
+
         gizmos.sphere(
-            best_velocity + *position,
+            p,
             Quat::IDENTITY,
             formation_settings.agent_radius,
             Color::BLUE,
+        );
+    }
+
+    for obstacle in &obstale_agents {
+        gizmos.sphere(
+            obstacle.position,
+            Quat::IDENTITY,
+            obstacle.shape.bounding_sphere().radius,
+            Color::RED,
         );
     }
 }
