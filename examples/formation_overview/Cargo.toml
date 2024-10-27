@@ -13,4 +13,4 @@ orca = { path = "../../crates/orca" }
 bevy_egui = { version = "0.24.0" }
 rand = "0.8.5"
 bevy_transform_gizmo = "0.10.2"
-bevy_mod_picking = "0.17.0"
+bevy_mod_picking = { version = "0.17.0", default-features = false, features = ["selection", "backend_raycast"] }

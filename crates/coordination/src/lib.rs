@@ -8,6 +8,7 @@ mod line_formation;
 mod queue_formation;
 mod v_formation;
 
+pub use expectation_maximization::best_matching_indexes;
 pub use formation::*;
 pub use formation_template::*;
 

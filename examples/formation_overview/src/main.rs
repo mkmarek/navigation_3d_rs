@@ -399,6 +399,12 @@ fn draw_combined_formation_ui(ui: &mut egui::Ui, formation_settings: &mut Format
     formation_settings.combined_line_formation_multiplier /= sum;
     formation_settings.combined_v_formation_multiplier /= sum;
     formation_settings.combined_queue_formation_multiplier /= sum;
+
+    ui.label("Defomation Penalty Multiplier");
+    ui.add(egui::Slider::new(
+        &mut formation_settings.deformation_penalty_multiplier,
+        0.0..=0.3,
+    ));
 }
 
 fn draw_circle_formation_ui(ui: &mut egui::Ui, formation_settings: &mut FormationSettings) {
@@ -517,7 +523,6 @@ fn draw_formations(
         formation_settings.number_of_yaw_samples,
         formation_settings.number_of_pitch_samples,
         formation_settings.max_steps_for_em,
-        &mut gizmos,
     );
 
     gizmos.line(aabb.center, aabb.center + best_velocity, Color::BLUE);

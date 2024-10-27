@@ -34,7 +34,7 @@ fn combine(values: &[&[Vec3]], coefficients: &[f32]) -> Vec<Vec3> {
     result
 }
 
-fn best_matching_indexes(a: &[Vec3], b: &[Vec3]) -> HashMap<usize, usize> {
+pub fn best_matching_indexes(a: &[Vec3], b: &[Vec3]) -> HashMap<usize, usize> {
     let matrix = a
         .iter()
         .map(|&a| {

@@ -1,6 +1,7 @@
 use bevy_math::Vec3;
 use geometry::Aabb;
 
+#[derive(Clone, Debug)]
 pub struct Formation {
     positions: Vec<Vec3>,
 }

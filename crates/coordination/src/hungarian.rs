@@ -60,10 +60,12 @@ pub fn hungarian(cost: &[&[f32]]) -> Vec<(usize, usize, f32)> {
                 break;
             }
 
-            let w_ = prv[w_curr].unwrap();
-            job[w_curr] = job[w_];
-
-            w_curr = w_;
+            if let Some(w_) = prv[w_curr] {
+                job[w_curr] = job[w_];
+                w_curr = w_;
+            } else {
+                break;
+            }
         }
     }
 
