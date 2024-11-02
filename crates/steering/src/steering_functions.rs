@@ -112,20 +112,9 @@ pub fn follow_path(
 
     if path_index == path.len() - 2 {
         if agent_position.distance(path[path_index + 1]) < position_tolerance {
-            println!("[1] end of path {}", Vec3::ZERO);
             return FollowPathResult::EndOfPath(Vec3::ZERO);
         }
 
-        println!(
-            "[2] arrive {}",
-            arrive(
-                path[path_index + 1],
-                agent_position,
-                agent_mass,
-                agent_max_force,
-                position_tolerance,
-            )
-        );
         return FollowPathResult::CurrentSegment(arrive(
             path[path_index + 1],
             agent_position,
@@ -150,7 +139,6 @@ pub fn follow_path(
             position_tolerance,
         );
 
-        println!("[3] current segment {}", seek_force);
         return FollowPathResult::CurrentSegment(seek_force);
     }
 
@@ -158,7 +146,6 @@ pub fn follow_path(
 
     if let SecondTangentPointResult::None = tangent_result {
         if agent_position.distance(path[path_index + 1]) < position_tolerance {
-            println!("[4] end of path {}", Vec3::ZERO);
             return FollowPathResult::NextSegment(Vec3::ZERO, path_index + 1);
         }
 
@@ -170,7 +157,6 @@ pub fn follow_path(
             position_tolerance,
         );
 
-        println!("[5] arrive {}", arrive_force);
         return FollowPathResult::CurrentSegment(arrive_force);
     }
 
@@ -191,19 +177,8 @@ pub fn follow_path(
         loop {
             if lookahead_index == path.len() - 2 {
                 if agent_position.distance(path[lookahead_index + 1]) < position_tolerance {
-                    println!("[6] end of path {}", Vec3::ZERO);
                     return FollowPathResult::EndOfPath(Vec3::ZERO);
                 }
-                println!(
-                    "[7] arrive {}",
-                    arrive(
-                        path[lookahead_index + 1],
-                        agent_position,
-                        agent_mass,
-                        agent_max_force,
-                        position_tolerance,
-                    )
-                );
                 return FollowPathResult::CurrentSegment(arrive(
                     path[lookahead_index + 1],
                     agent_position,
@@ -242,10 +217,8 @@ pub fn follow_path(
     );
 
     if lookahead_index == path_index {
-        println!("[8] current segment {}", seek_force);
         FollowPathResult::CurrentSegment(seek_force)
     } else {
-        println!("[9] next segment {}", seek_force);
         FollowPathResult::NextSegment(seek_force, lookahead_index)
     }
 }

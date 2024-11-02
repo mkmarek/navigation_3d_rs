@@ -184,7 +184,7 @@ fn update_agents(
                 .take(NUMBER_OF_NEIGHBORS)
                 //.map(|a| create_orca_plane(&self_agent, a, TIME_HORIZON, TIME_STEP))
                 //    .collect::<Vec<Plane>>();
-                .map(|a| {
+                .filter_map(|a| {
                     AccelerationVelocityObstacle3D::new(
                         &self_agent,
                         a,

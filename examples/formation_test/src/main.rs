@@ -45,7 +45,7 @@ struct FormationComponent {
 }
 
 const BOX_SIZE: f32 = 500.0;
-const NUMBER_OF_OBSTACLES: usize = 8;
+const NUMBER_OF_OBSTACLES: usize = 3;
 const TURNING_SPEED: f32 = 2.0;
 const MAX_SPEED: f32 = 80.0;
 const MAX_FORCE: f32 = 50.0;
@@ -87,7 +87,7 @@ fn main() {
 
 fn setup(
     mut commands: Commands,
-    mut _meshes: ResMut<Assets<Mesh>>,
+    mut meshes: ResMut<Assets<Mesh>>,
     mut standard_materials: ResMut<Assets<StandardMaterial>>,
     asset_server: Res<AssetServer>,
 ) {
@@ -171,6 +171,44 @@ fn setup(
             },
         ))
         .add_child(light);
+
+    let mut rng = thread_rng();
+
+    for x in 0..NUMBER_OF_OBSTACLES {
+        for y in 0..NUMBER_OF_OBSTACLES {
+            for z in 0..NUMBER_OF_OBSTACLES {
+                let x = x as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
+                let y = y as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
+                let z = z as f32 * BOX_SIZE / NUMBER_OF_OBSTACLES as f32;
+
+                let x = x + rng.gen_range(-50.0..50.0);
+                let y = y + rng.gen_range(-50.0..50.0);
+                let z = z + rng.gen_range(-50.0..50.0);
+                let radius = rng.gen_range(OBSTACLE_RADIUS);
+
+                commands
+                    .spawn(PbrBundle {
+                        mesh: meshes.add(
+                            shape::UVSphere {
+                                radius,
+                                ..Default::default()
+                            }
+                            .into(),
+                        ),
+                        material: standard_materials.add(StandardMaterial {
+                            base_color: Color::rgb(0.5, 0.5, 0.5),
+                            ..Default::default()
+                        }),
+                        transform: Transform::from_translation(Vec3::new(x, y, z)),
+                        ..Default::default()
+                    })
+                    .insert(Obstacle {
+                        radius,
+                        collider: Sphere::new(radius, Vec3::new(x, y, z)),
+                    });
+            }
+        }
+    }
 }
 
 fn generate_path(
@@ -241,20 +279,30 @@ fn move_formation_along_path(
                 template
             }));
 
-        let (best_formation, best_velocity) = template_set.get_best_formation_and_velocity(
+        let (best_formation, _) = template_set.get_best_formation_and_velocity(
             formation.formation.get_positions(),
             desired_velocity,
             MAX_SPEED,
             0.02f32,
-            &[],
+            obstacles
+                .iter()
+                .map(|(transform, obstacle)| {
+                    Agent3D::new(
+                        transform.translation,
+                        Vec3::ZERO,
+                        Collider::new_sphere(obstacle.radius),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .as_slice(),
             5.0,
             25,
             25,
             200,
         );
+        let best_velocity = desired_velocity;
 
         velocity.value = best_velocity;
-        println!("Best formation: {:?}", best_formation);
 
         let formation_rotation = Quat::from_rotation_arc(Vec3::Z, best_velocity.normalize());
         let new_positions = best_formation
@@ -296,9 +344,9 @@ fn move_agents_to_position(
     time: Res<Time>,
     mut gizmos: Gizmos,
     mut agents: Query<(Entity, &mut Transform, &Agent, &mut Velocity)>,
-    obstacles: Query<(&Transform, &Obstacle), Without<Agent>>,
+    obstacles: Query<(Entity, &Transform, &Obstacle), Without<Agent>>,
 ) {
-    let agent_instances = agents
+    let mut agent_instances = agents
         .iter()
         .map(|(entity, transform, _, velocity)| {
             (
@@ -311,6 +359,22 @@ fn move_agents_to_position(
             )
         })
         .collect::<Vec<_>>();
+
+    agent_instances.extend(
+        obstacles
+            .iter()
+            .map(|(entity, transform, obstacle)| {
+                (
+                    entity,
+                    Agent3D::new(
+                        transform.translation,
+                        Vec3::ZERO,
+                        Collider::new_sphere(obstacle.radius),
+                    ),
+                )
+            })
+            .collect::<Vec<_>>(),
+    );
 
     let time_horizon = MAX_SPEED / (MAX_FORCE / AGENT_MASS);
     for (entity, mut agent_transform, agent, mut velocity) in agents.iter_mut() {
@@ -335,16 +399,14 @@ fn move_agents_to_position(
                     return None;
                 }
 
-                Some(
-                    AccelerationVelocityObstacle3D::new(
-                        &self_agent,
-                        other_agent,
-                        time_horizon,
-                        2.0 * MAX_SPEED / MAX_ACCELERATION,
-                        25,
-                    )
-                    .orca_plane(time.delta_seconds()),
+                AccelerationVelocityObstacle3D::new(
+                    &self_agent,
+                    other_agent,
+                    time_horizon,
+                    2.0 * MAX_SPEED / MAX_ACCELERATION,
+                    25,
                 )
+                .orca_plane(time.delta_seconds())
             })
             .collect::<Vec<_>>();
 

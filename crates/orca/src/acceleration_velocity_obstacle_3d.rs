@@ -71,33 +71,40 @@ impl AVOBoundary {
         Self::clean_self_intersections(&mut right_boundary);
 
         let arc = {
-            let boundary_a = left_boundary.last().unwrap();
-            let boundary_b = right_boundary.last().unwrap();
-
-            let a = boundary_a.end();
-            let b = boundary_b.origin;
-
-            if let Ray2DIntersectionResult::Point(t) =
-                boundary_a.to_ray().intersect(&boundary_b.to_ray())
+            if let (Some(boundary_a), Some(boundary_b)) =
+                (left_boundary.last(), right_boundary.last())
             {
-                let r = radius * Self::scale_factor(acc_control_param, time_horizon);
+                let a = boundary_a.end();
+                let b = boundary_b.origin;
 
-                if r < a.distance(b) / 2.0 {
-                    AVOBoundary::LineSegment(LineSegment2D::from_two_points(a, b))
-                } else {
-                    let (a1, a2) = Arc2D::from_points(r, a, b);
-                    let intersection = boundary_a.origin + boundary_a.direction * t;
+                if let Ray2DIntersectionResult::Point(t) =
+                    boundary_a.to_ray().intersect(&boundary_b.to_ray())
+                {
+                    let r = radius * Self::scale_factor(acc_control_param, time_horizon);
 
-                    if a1.center.distance_squared(intersection)
-                        > a2.center.distance_squared(intersection)
-                    {
-                        AVOBoundary::Arc(a1)
+                    if r < a.distance(b) / 2.0 {
+                        Some(AVOBoundary::LineSegment(LineSegment2D::from_two_points(
+                            a, b,
+                        )))
                     } else {
-                        AVOBoundary::Arc(a2)
+                        let (a1, a2) = Arc2D::from_points(r, a, b);
+                        let intersection = boundary_a.origin + boundary_a.direction * t;
+
+                        if a1.center.distance_squared(intersection)
+                            > a2.center.distance_squared(intersection)
+                        {
+                            Some(AVOBoundary::Arc(a1))
+                        } else {
+                            Some(AVOBoundary::Arc(a2))
+                        }
                     }
+                } else {
+                    Some(AVOBoundary::LineSegment(LineSegment2D::from_two_points(
+                        a, b,
+                    )))
                 }
             } else {
-                AVOBoundary::LineSegment(LineSegment2D::from_two_points(a, b))
+                None
             }
         };
 
@@ -108,7 +115,9 @@ impl AVOBoundary {
             .for_each(|line_segment| result.push(AVOBoundary::LineSegment(line_segment)));
         right_boundary.reverse();
 
-        result.push(arc);
+        if let Some(arc) = arc {
+            result.push(arc);
+        }
 
         right_boundary
             .drain(..)
@@ -119,8 +128,7 @@ impl AVOBoundary {
 
     fn clean_self_intersections(boundary: &mut Vec<LineSegment2D>) {
         for i in 0..boundary.len() {
-            let mut intesecting_line = None;
-            let mut t = None;
+            let mut intesecting_line_and_t = None;
 
             for j in i + 1..boundary.len() {
                 let intersection = boundary[i].intersect(&boundary[j]);
@@ -131,13 +139,12 @@ impl AVOBoundary {
                         continue;
                     }
 
-                    intesecting_line = Some(j);
-                    t = Some(t1);
+                    intesecting_line_and_t = Some((j, t1));
                 }
             }
 
-            if let Some(intesecting_line) = intesecting_line {
-                boundary[i].t_max = t.unwrap();
+            if let Some((intesecting_line, t)) = intesecting_line_and_t {
+                boundary[i].t_max = t;
                 boundary.drain(i + 1..intesecting_line);
             }
         }
@@ -258,7 +265,7 @@ impl AccelerationVelocityObstacle3D {
 
     #[must_use]
     #[allow(clippy::too_many_lines)]
-    pub fn orca_plane(&self, time_step: f32) -> Plane {
+    pub fn orca_plane(&self, time_step: f32) -> Option<Plane> {
         let radius = self.shape.bounding_sphere().radius;
         let shape_sphere = Sphere::new(radius, Vec3::ZERO);
 
@@ -431,6 +438,10 @@ impl AccelerationVelocityObstacle3D {
             //    }
             //}
 
+            if boundary.is_empty() {
+                return None;
+            }
+
             let (mut u, mut normal) = boundary[0].closest_point_and_normal(v_ab);
 
             for boundary in boundary.iter().skip(1) {
@@ -448,7 +459,7 @@ impl AccelerationVelocityObstacle3D {
             (u - self.relative_velocity, normal)
         };
 
-        Plane::new(self.responsibility * u, normal)
+        Some(Plane::new(self.responsibility * u, normal))
     }
 
     fn avo_center(
