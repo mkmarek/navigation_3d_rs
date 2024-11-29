@@ -523,6 +523,7 @@ fn draw_formations(
         formation_settings.number_of_yaw_samples,
         formation_settings.number_of_pitch_samples,
         formation_settings.max_steps_for_em,
+        &mut gizmos,
     );
 
     gizmos.line(aabb.center, aabb.center + best_velocity, Color::BLUE);

@@ -1,4 +1,6 @@
+use bevy_gizmos::gizmos::Gizmos;
 use bevy_math::Vec3;
+use bevy_render::color::Color;
 use geometry::{colliders::Collider, Aabb};
 use orca::{optimize_velocity_3d, Agent3D, FormationVelocityObstacle3D};
 
@@ -63,17 +65,33 @@ impl<'a> FormationTemplateSet<'a> {
         number_of_yaw_samples: u16,
         number_of_pitch_samples: u16,
         max_steps_for_em: usize,
+        gizmos: &mut Gizmos,
     ) -> (Formation, Vec3) {
         let mut best_formation = None;
         let mut best_velocity = None;
         let mut best_fitness = f32::NEG_INFINITY;
+
+        let (formation_aabb, center) = {
+            let mut min = Vec3::splat(f32::INFINITY);
+            let mut max = Vec3::splat(f32::NEG_INFINITY);
+
+            for position in current_formation {
+                min = min.min(*position);
+                max = max.max(*position);
+            }
+
+            (
+                Collider::new_aabb(Vec3::ZERO, (max - min) / 2.0),
+                (min + max) / 2.0,
+            )
+        };
 
         // First evaluate the fitness of each template formation
         for template in &self.0 {
             let template_aabb = template.get_aabb(current_formation.len());
 
             let formation_agent = Agent3D::new(
-                template_aabb.center,
+                center,
                 preffered_velocity,
                 Collider::new_aabb(Vec3::ZERO, template_aabb.half_sizes),
             );
@@ -86,6 +104,15 @@ impl<'a> FormationTemplateSet<'a> {
                         obstacle,
                         obstacle_avoidance_time_horizon,
                     );
+
+                    //let triangles =
+                    //    vo.construct_vo_mesh(number_of_yaw_samples, number_of_pitch_samples, 0.0);
+
+                    //for triangle in triangles {
+                    //    gizmos.line(triangle[0], triangle[1], Color::RED);
+                    //    gizmos.line(triangle[1], triangle[2], Color::RED);
+                    //    gizmos.line(triangle[2], triangle[0], Color::RED);
+                    //}
 
                     vo.orca_plane(number_of_yaw_samples, number_of_pitch_samples, 0.0)
                 })
@@ -108,21 +135,6 @@ impl<'a> FormationTemplateSet<'a> {
 
         // Now evaluate the fitness of the current formation
         {
-            let (formation_aabb, center) = {
-                let mut min = Vec3::splat(f32::INFINITY);
-                let mut max = Vec3::splat(f32::NEG_INFINITY);
-
-                for position in current_formation {
-                    min = min.min(*position);
-                    max = max.max(*position);
-                }
-
-                (
-                    Collider::new_aabb(Vec3::ZERO, (max - min) / 2.0),
-                    (min + max) / 2.0,
-                )
-            };
-
             let formation_agent = Agent3D::new(center, preffered_velocity, formation_aabb);
 
             let orca_planes = obtacles

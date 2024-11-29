@@ -91,6 +91,10 @@ impl Sphere {
     pub fn is_inside(&self, other: &Sphere) -> bool {
         self.origin.distance(other.origin) + self.radius <= other.radius
     }
+
+    pub fn distance_to(&self, other: &Sphere) -> f32 {
+        self.origin.distance(other.origin) - (self.radius + other.radius)
+    }
 }
 
 pub trait SphereMinkowskiSum {
