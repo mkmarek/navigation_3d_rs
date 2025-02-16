@@ -248,7 +248,7 @@ fn draw_gizmos(
         let orca_planes = nearest_neighbors
             .iter()
             .take(NUMBER_OF_NEIGHBORS)
-            .map(|a| {
+            .filter_map(|a| {
                 let mut self_agent = Agent3D::new(
                     transform.translation,
                     velocity.value,
